@@ -1,0 +1,235 @@
+
+> my-app@0.1.0 lint
+> eslint
+
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/ai-mapping/page.tsx
+  4:8  warning  'Link' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/analytics/page.tsx
+   6:3    warning  'BarChart' is defined but never used      @typescript-eslint/no-unused-vars
+   6:13   warning  'Bar' is defined but never used           @typescript-eslint/no-unused-vars
+   6:18   warning  'Cell' is defined but never used          @typescript-eslint/no-unused-vars
+  16:36   warning  'sub' is defined but never used           @typescript-eslint/no-unused-vars
+  16:114  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/detections/page.tsx
+    7:3   warning  'ChevronRight' is defined but never used                         @typescript-eslint/no-unused-vars
+   10:10  warning  'cn' is defined but never used                                   @typescript-eslint/no-unused-vars
+   66:73  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+   66:78  error    `'` can be escaped with `&apos;`, `&lsquo;`, `&#39;`, `&rsquo;`  react/no-unescaped-entities
+  134:48  warning  'idx' is defined but never used                                  @typescript-eslint/no-unused-vars
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/explorer/[eventId]/components.tsx
+    5:10  warning  'formatDuration' is defined but never used    @typescript-eslint/no-unused-vars
+    5:26  warning  'formatConfidence' is defined but never used  @typescript-eslint/no-unused-vars
+    8:41  warning  'SkipForward' is defined but never used       @typescript-eslint/no-unused-vars
+    8:54  warning  'Activity' is defined but never used          @typescript-eslint/no-unused-vars
+   14:74  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+  204:38  error    Unexpected any. Specify a different type      @typescript-eslint/no-explicit-any
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/explorer/inspector.tsx
+    5:10  warning  'formatNumber' is defined but never used                         @typescript-eslint/no-unused-vars
+    5:24  warning  'formatDuration' is defined but never used                       @typescript-eslint/no-unused-vars
+   18:86  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+   24:47  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   24:55  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   34:47  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   34:55  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   35:42  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   35:50  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   44:47  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   44:55  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   55:49  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   55:57  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   68:49  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   68:57  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   91:49  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+   91:57  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  104:49  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  104:57  error    `"` can be escaped with `&quot;`, `&ldquo;`, `&#34;`, `&rdquo;`  react/no-unescaped-entities
+  267:37  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+  321:30  error    Unexpected any. Specify a different type                         @typescript-eslint/no-explicit-any
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/explorer/page.tsx
+    5:10  warning  'PageHeader' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+   14:3   warning  'formatConfidence' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+   33:3   warning  'Brain' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+   40:7   warning  'CATEGORIES' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+  187:9   warning  'router' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      @typescript-eslint/no-unused-vars
+  232:21  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/explorer/page.tsx:232:21
+  230 |   }, [searchText, selectedSeverities, selectedCategories, selectedSourceIds, page, sortBy, sortDir]);
+  231 |
+> 232 |   useEffect(() => { doSearch(); }, [doSearch]);
+      |                     ^^^^^^^^ Avoid calling setState() directly within an effect
+  233 |   useEffect(() => { fetchSources().then(setSources); }, []);
+  234 |
+  235 |   // Keyboard shortcut: / to focus search  react-hooks/set-state-in-effect
+  257:68  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
+  257:82  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/health/page.tsx
+   5:3   warning  'Server' is defined but never used              @typescript-eslint/no-unused-vars
+   5:11  warning  'Cpu' is defined but never used                 @typescript-eslint/no-unused-vars
+   5:27  warning  'Network' is defined but never used             @typescript-eslint/no-unused-vars
+   6:44  warning  'Zap' is defined but never used                 @typescript-eslint/no-unused-vars
+  10:18  warning  'LineChart' is defined but never used           @typescript-eslint/no-unused-vars
+  10:29  warning  'Line' is defined but never used                @typescript-eslint/no-unused-vars
+  13:36  warning  'LATENCY_CHART_DATA' is defined but never used  @typescript-eslint/no-unused-vars
+  27:55  warning  'isMain' is assigned a value but never used     @typescript-eslint/no-unused-vars
+  27:73  error    Unexpected any. Specify a different type        @typescript-eslint/no-explicit-any
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/overview/components.tsx
+   3:10  warning  'useMemo' is defined but never used          @typescript-eslint/no-unused-vars
+   5:10  warning  'Server' is defined but never used           @typescript-eslint/no-unused-vars
+   5:64  warning  'ServerCrash' is defined but never used      @typescript-eslint/no-unused-vars
+   8:49  warning  'PipelineMetrics' is defined but never used  @typescript-eslint/no-unused-vars
+  16:52  error    Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+  23:32  error    Unexpected any. Specify a different type     @typescript-eslint/no-explicit-any
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/overview/page.tsx
+   10:10  warning  'Separator' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  250:5   error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/overview/page.tsx:250:5
+  248 |
+  249 |   useEffect(() => {
+> 250 |     load();
+      |     ^^^^ Avoid calling setState() directly within an effect
+  251 |   }, [load]);
+  252 |
+  253 |   // Clear new event highlights  react-hooks/set-state-in-effect
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/parsers/page.tsx
+    7:16  warning  'Clock' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     @typescript-eslint/no-unused-vars
+    7:31  warning  'ChevronRight' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-unused-vars
+    7:45  warning  'Activity' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  @typescript-eslint/no-unused-vars
+    8:28  warning  'AlertTriangle' is defined but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+  182:16  error    Error: Cannot create components during render
+
+Components created during render will reset their state each time they are created. Declare components outside of render.
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/parsers/page.tsx:182:16
+  180 |               <p className="text-[#94a3b8] text-xs mb-6 max-w-[90%]">{selectedParser.description}</p>
+  181 |               
+> 182 |               <LifecycleStepper status={selectedParser.status} />
+      |                ^^^^^^^^^^^^^^^^ This component is created during render
+  183 |               
+  184 |               <div className="flex gap-2 mt-6">
+  185 |                 <Button 
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/parsers/page.tsx:34:26
+  32 |   };
+  33 |
+> 34 | const LifecycleStepper = ({ status }: { status: ParserStatus }) => {
+     |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 35 |   const stages = ["Draft", "Testing", "Validated", "Active"];
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 36 |   const currentIndex = stages.indexOf(status === "Deprecated" ? "Active" : status);
+     …
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 68 |   );
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+> 69 | };
+     | ^^ The component is created during render here
+  70 |
+  71 |   return (
+  72 |     <div className="flex flex-col h-full bg-[#050709] relative overflow-hidden">  react-hooks/static-components
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/parsers/studio/components.tsx
+  3:10  warning  'useState' is defined but never used     @typescript-eslint/no-unused-vars
+  6:3   warning  'Brackets' is defined but never used     @typescript-eslint/no-unused-vars
+  7:3   warning  'Play' is defined but never used         @typescript-eslint/no-unused-vars
+  7:31  warning  'PlayCircle' is defined but never used   @typescript-eslint/no-unused-vars
+  7:43  warning  'Eye' is defined but never used          @typescript-eslint/no-unused-vars
+  7:48  warning  'ShieldCheck' is defined but never used  @typescript-eslint/no-unused-vars
+  7:61  warning  'BoxSelect' is defined but never used    @typescript-eslint/no-unused-vars
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/parsers/studio/page.tsx
+  8:50  warning  'ParserStatus' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/pipeline/components.tsx
+   3:10  warning  'useState' is defined but never used    @typescript-eslint/no-unused-vars
+   3:20  warning  'useEffect' is defined but never used   @typescript-eslint/no-unused-vars
+   3:31  warning  'useRef' is defined but never used      @typescript-eslint/no-unused-vars
+   7:10  warning  'StatusDot' is defined but never used   @typescript-eslint/no-unused-vars
+  16:3   warning  'GitCommit' is defined but never used   @typescript-eslint/no-unused-vars
+  17:3   warning  'ArrowRight' is defined but never used  @typescript-eslint/no-unused-vars
+  19:3   warning  'Play' is defined but never used        @typescript-eslint/no-unused-vars
+  21:3   warning  'Activity' is defined but never used    @typescript-eslint/no-unused-vars
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/pipeline/page.tsx
+  18:7   warning  'EventFlow' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+  18:40  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              @typescript-eslint/no-explicit-any
+  33:28  error    'FileJson' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react/jsx-no-undef
+  34:27  error    'FileCode2' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            react/jsx-no-undef
+  35:30  error    'FileType' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react/jsx-no-undef
+  36:27  error    'Code2' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                react/jsx-no-undef
+  37:24  error    'FileText' is not defined                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             react/jsx-no-undef
+  64:10  warning  'loading' is assigned a value but never used                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  81:21  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/pipeline/page.tsx:81:21
+  79 |   }, [liveFeedActive, events.length]);
+  80 |
+> 81 |   useEffect(() => { load(); }, [load]);
+     |                     ^^^^ Avoid calling setState() directly within an effect
+  82 |   useInterval(load, liveFeedActive ? 2000 : null);
+  83 |
+  84 |   const selectedEvent = events.find(e => e.id === selectedEventId) || null;  react-hooks/set-state-in-effect
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/settings/page.tsx
+  12:72  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/sources/new/page.tsx
+   3:20  warning  'useEffect' is defined but never used     @typescript-eslint/no-unused-vars
+   4:8   warning  'Link' is defined but never used          @typescript-eslint/no-unused-vars
+   7:10  warning  'CodeBlock' is defined but never used     @typescript-eslint/no-unused-vars
+  10:53  warning  'CheckSquare' is defined but never used   @typescript-eslint/no-unused-vars
+  58:60  error    Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/app/(platform)/sources/page.tsx
+   6:10  warning  'SeverityBadge' is defined but never used       @typescript-eslint/no-unused-vars
+   7:21  warning  'ServiceStatusBadge' is defined but never used  @typescript-eslint/no-unused-vars
+   9:10  warning  'Skeleton' is defined but never used            @typescript-eslint/no-unused-vars
+  14:16  warning  'Filter' is defined but never used              @typescript-eslint/no-unused-vars
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/components/ui/command-palette.tsx
+   5:18  warning  'X' is defined but never used                                     @typescript-eslint/no-unused-vars
+  24:11  error    An interface declaring no members is equivalent to its supertype  @typescript-eslint/no-empty-object-type
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/lib/utils/hooks.ts
+  64:10  error  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+/Users/nischalsingana/DEV/Team-ZeroTrace/my-app/lib/utils/hooks.ts:64:10
+  62 |     ref.current = value;
+  63 |   }, [value]);
+> 64 |   return ref.current;
+     |          ^^^^^^^^^^^ Cannot access ref value during render
+  65 | }
+  66 |  react-hooks/refs
+
+✖ 106 problems (43 errors, 63 warnings)
+
