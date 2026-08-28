@@ -164,13 +164,15 @@ services:
 
   # ── Nginx Reverse Proxy ────────────────────────────────────────
   nginx:
-    image: nginx:alpine
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
     container_name: ulpf-nginx
     depends_on:
       - frontend
       - backend
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    # volumes:
+    #   - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     # ports:
     #   - "80:80"
     #   - "443:443"
