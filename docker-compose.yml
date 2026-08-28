@@ -129,6 +129,11 @@ services:
       MINIO_ENDPOINT: minio:9000
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPEN_KEY_1: ${OPEN_KEY_1:-}
+      OPEN_KEY_2: ${OPEN_KEY_2:-}
+      OPEN_KEY_3: ${OPEN_KEY_3:-}
+      OPEN_KEY_4: ${OPEN_KEY_4:-}
+      OPEN_KEY_5: ${OPEN_KEY_5:-}
       OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-3-ultra-550b-a55b:free}
       AI_ENABLED: ${AI_ENABLED:-true}
