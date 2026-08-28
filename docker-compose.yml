@@ -11,8 +11,8 @@ services:
       POSTGRES_DB: ulpf
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # ports:
+    #   - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ulpf -d ulpf"]
       interval: 5s
@@ -26,8 +26,8 @@ services:
     container_name: ulpf-redis
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
+    # ports:
+    #   - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -45,9 +45,9 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
       - minio_data:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
+    # ports:
+    #   - "9000:9000"
+    #   - "9001:9001"
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
@@ -70,8 +70,8 @@ services:
         hard: -1
     volumes:
       - opensearch_data:/usr/share/opensearch/data
-    ports:
-      - "9200:9200"
+    # ports:
+    #   - "9200:9200"
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 10s
@@ -93,8 +93,8 @@ services:
     container_name: ulpf-kafka
     depends_on:
       - zookeeper
-    ports:
-      - "9092:9092"
+    # ports:
+    #   - "9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -134,8 +134,8 @@ services:
       AI_ENABLED: ${AI_ENABLED:-true}
       DEMO_MODE: ${DEMO_MODE:-true}
       SECRET_KEY: ${SECRET_KEY:-ulpf-change-me-in-production}
-    ports:
-      - "8000:8000"
+    # ports:
+    #   - "8000:8000"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
@@ -153,8 +153,8 @@ services:
       - backend
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
-    ports:
-      - "3000:3000"
+    # ports:
+    #   - "3000:3000"
     restart: unless-stopped
 
   # ── Nginx Reverse Proxy ────────────────────────────────────────
@@ -166,9 +166,9 @@ services:
       - backend
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-    ports:
-      - "80:80"
-      - "443:443"
+    # ports:
+    #   - "80:80"
+    #   - "443:443"
     restart: unless-stopped
 
 volumes:
