@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import {
-  Code2, Plus, Search, X,
-  GitCommit, CheckCircle2, ArrowLeftRight
-} from "lucide-react";
+import { Tooltip, MetricLabel } from "@/components/ui/tooltip";
+import { PageErrorState } from "@/components/ui/error-fallback";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Timestamp } from "@/components/ui/timestamp";
 import { cn } from "@/lib/utils/cn";
-import { useRouter } from "next/navigation";
 import { fetchParsers } from "@/lib/services/parsers";
 import type { Parser } from "@/lib/types";
+import {
+  Code2, Plus, Search, X,
+  GitCommit, CheckCircle2, ArrowLeftRight, FileCode2
+} from "lucide-react";
 
 function LifecycleStepper({ enabled }: { enabled: boolean }) {
   const stages = ["Draft", "Testing", "Validated", "Active"];
@@ -49,146 +53,205 @@ function LifecycleStepper({ enabled }: { enabled: boolean }) {
   );
 }
 
+function TableSkeleton() {
+  return (
+    <>
+      {Array.from({ length: 6 }).map((_, i) => (
+        <tr key={i} className="border-b border-[#1e2d3d]/50">
+          <td className="px-4 py-3"><div className="h-3 bg-[#1e2d3d]/50 rounded animate-pulse w-3/4" /></td>
+          <td className="px-4 py-3"><div className="h-3 bg-[#1e2d3d]/50 rounded animate-pulse w-16" /></td>
+          <td className="px-4 py-3 text-center"><div className="h-3 bg-[#1e2d3d]/50 rounded animate-pulse w-8 mx-auto" /></td>
+          <td className="px-4 py-3 text-center"><div className="h-3 bg-[#1e2d3d]/50 rounded animate-pulse w-12 mx-auto" /></td>
+          <td className="px-4 py-3 text-right"><div className="h-3 bg-[#1e2d3d]/50 rounded animate-pulse w-16 ml-auto" /></td>
+          <td className="px-4 py-3 text-right"><div className="h-3 bg-[#1e2d3d]/50 rounded animate-pulse w-12 ml-auto" /></td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
 export default function ParsersPage() {
   const router = useRouter();
   const [parsers, setParsers] = useState<Parser[]>([]);
   const [selectedParser, setSelectedParser] = useState<Parser | null>(null);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
 
-  useEffect(() => {
-    fetchParsers().then((data) => {
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await fetchParsers();
       setParsers(data);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
       setLoading(false);
-    });
+    }
   }, []);
 
-  const filteredParsers = parsers.filter(p => 
-    p.name.toLowerCase().includes(search.toLowerCase()) || 
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const filteredParsers = parsers.filter(p =>
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
     (p.description && p.description.toLowerCase().includes(search.toLowerCase()))
   );
 
   const getStatusColor = (enabled: boolean) => {
-    return enabled 
+    return enabled
       ? "text-[#4ade80] bg-[#4ade80]/10 border-[#4ade80]/30"
       : "text-[#ef4444] bg-[#ef4444]/10 border-[#ef4444]/30";
   };
 
   return (
     <div className="flex flex-col h-full bg-[#050709] relative overflow-hidden">
-      
-      <PageHeader 
-        title="Parser Registry" 
+
+      <PageHeader
+        title="Parser Registry"
         description="Version control and deployment management for platform log parsers."
         actions={
           <div className="flex items-center gap-3">
             <div className="relative w-64">
               <Search className="w-4 h-4 text-[#64748b] absolute left-3 top-1/2 -translate-y-1/2" />
-              <input 
-                type="text" 
+              <input
+                type="text"
                 placeholder="Search parsers..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="w-full bg-[#0a0d12] border border-[#1e2d3d] rounded-lg pl-9 pr-4 py-1.5 text-xs text-[#e2e8f0] focus:border-[#3b82f6] outline-none transition-colors"
               />
             </div>
-            <Button 
-              className="bg-[#3b82f6] hover:bg-[#2563eb] text-white border-none" 
-              size="sm" 
-              leftIcon={<Plus className="w-3.5 h-3.5"/>}
-            >
-              New Parser
-            </Button>
+            <Tooltip content="Create a new parser in the studio">
+              <Button
+                className="bg-[#3b82f6] hover:bg-[#2563eb] text-white border-none"
+                size="sm"
+                onClick={() => router.push("/parsers/studio")}
+                leftIcon={<Plus className="w-3.5 h-3.5"/>}
+              >
+                New Parser
+              </Button>
+            </Tooltip>
           </div>
         }
       />
 
       <div className="flex-1 flex overflow-hidden">
-        
-        <div className="flex-1 overflow-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#0a0d12] border-b border-[#1e2d3d] sticky top-0 z-10">
-                <th className="px-4 py-2 text-[#64748b] text-[10px] uppercase font-bold tracking-widest font-mono w-1/4">Parser Name</th>
-                <th className="px-4 py-2 text-[#64748b] text-[10px] uppercase font-bold tracking-widest font-mono">Format</th>
-                <th className="px-4 py-2 text-[#64748b] text-[10px] uppercase font-bold tracking-widest font-mono text-center">Version</th>
-                <th className="px-4 py-2 text-[#64748b] text-[10px] uppercase font-bold tracking-widest font-mono text-center">Status</th>
-                <th className="px-4 py-2 text-[#64748b] text-[10px] uppercase font-bold tracking-widest font-mono text-right">Type</th>
-                <th className="px-4 py-2 text-[#64748b] text-[10px] uppercase font-bold tracking-widest font-mono text-right">Accuracy</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                Array.from({ length: 6 }).map((_, i) => (
-                  <tr key={i} className="border-b border-[#1e2d3d]/50">
-                    <td colSpan={6} className="px-6 py-4">
-                      <div className="h-3 bg-[#1e2d3d]/50 rounded animate-pulse w-3/4" />
-                    </td>
-                  </tr>
-                ))
-              ) : filteredParsers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-[#64748b] text-sm">
-                    No parsers found.
-                  </td>
-                </tr>
-              ) : (
-                filteredParsers.map(parser => (
-                  <tr 
-                    key={parser.id}
-                    onClick={() => setSelectedParser(parser)}
-                    className={cn(
-                      "border-b border-[#1e2d3d]/50 cursor-pointer transition-colors group",
-                      selectedParser?.id === parser.id ? "bg-[#1c2433]/50" : "hover:bg-[#0d1117]"
-                    )}
-                  >
-                    <td className="px-4 py-2.5">
-                      <div className="flex flex-col">
-                        <span className={cn("text-sm", selectedParser?.id === parser.id ? "text-[#e2e8f0] font-bold" : "text-[#e2e8f0] group-hover:text-white font-medium")}>
-                          {parser.name}
-                        </span>
-                        <span className="text-[#64748b] text-[10px] font-mono mt-0.5">{parser.format}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <span className="text-[#94a3b8] text-[11px] font-mono bg-[#1c2433] px-2 py-0.5 rounded border border-[#243044]">
-                        {parser.format}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className="text-[#a5b4fc] text-xs font-mono font-bold">{parser.version}</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className={cn("text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border uppercase", getStatusColor(parser.enabled))}>
-                        {parser.enabled ? "Active" : "Disabled"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <span className="text-[#94a3b8] text-xs font-mono">{parser.type}</span>
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <span className={cn("text-xs font-mono font-bold", parser.accuracy > 0.99 ? "text-[#4ade80]" : parser.accuracy > 0.90 ? "text-[#eab308]" : "text-[#ef4444]")}>
-                        {(parser.accuracy * 100).toFixed(1)}%
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
 
-        {selectedParser && (
+        {error ? (
+          <PageErrorState error={error} onRetry={load} />
+        ) : (
+          <div className="flex-1 overflow-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#0a0d12] border-b border-[#1e2d3d] sticky top-0 z-10">
+                  <th className="px-4 py-2 text-[#64748b] text-[10px] uppercase font-bold tracking-widest font-mono w-1/4">
+                    <MetricLabel label="Parser Name" tooltip="The registered name of the parser configuration." />
+                  </th>
+                  <th className="px-4 py-2 text-[#64748b] text-[10px] uppercase font-bold tracking-widest font-mono">
+                    <MetricLabel label="Format" tooltip="The log format this parser is designed to consume." />
+                  </th>
+                  <th className="px-4 py-2 text-[#64748b] text-[10px] uppercase font-bold tracking-widest font-mono text-center">
+                    <MetricLabel label="Version" tooltip="Current deployed version of the parser." />
+                  </th>
+                  <th className="px-4 py-2 text-[#64748b] text-[10px] uppercase font-bold tracking-widest font-mono text-center">
+                    <MetricLabel label="Status" tooltip="Whether the parser is active and processing events." />
+                  </th>
+                  <th className="px-4 py-2 text-[#64748b] text-[10px] uppercase font-bold tracking-widest font-mono text-right">
+                    <MetricLabel label="Type" tooltip="Extraction engine used by the parser (regex, grok, JSON, etc.)." />
+                  </th>
+                  <th className="px-4 py-2 text-[#64748b] text-[10px] uppercase font-bold tracking-widest font-mono text-right">
+                    <MetricLabel label="Accuracy" tooltip="Measured parsing accuracy from test samples (0–100%)." />
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <TableSkeleton />
+                ) : filteredParsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8">
+                      <EmptyState
+                        title={search ? "No parsers match your search" : "No parsers registered"}
+                        description={search ? "Try adjusting your search terms." : "Get started by creating your first parser in the studio."}
+                        icon={<FileCode2 className="w-8 h-8" />}
+                        action={
+                          <Button
+                            size="sm"
+                            onClick={() => router.push("/parsers/studio")}
+                            leftIcon={<Plus className="w-3.5 h-3.5" />}
+                          >
+                            New Parser
+                          </Button>
+                        }
+                      />
+                    </td>
+                  </tr>
+                ) : (
+                  filteredParsers.map(parser => (
+                    <tr
+                      key={parser.id}
+                      onClick={() => setSelectedParser(parser)}
+                      className={cn(
+                        "border-b border-[#1e2d3d]/50 cursor-pointer transition-colors group",
+                        selectedParser?.id === parser.id ? "bg-[#1c2433]/50" : "hover:bg-[#0d1117]"
+                      )}
+                    >
+                      <td className="px-4 py-2.5">
+                        <div className="flex flex-col">
+                          <span className={cn("text-sm", selectedParser?.id === parser.id ? "text-[#e2e8f0] font-bold" : "text-[#e2e8f0] group-hover:text-white font-medium")}>
+                            {parser.name}
+                          </span>
+                          <span className="text-[#64748b] text-[10px] font-mono mt-0.5">{parser.format}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className="text-[#94a3b8] text-[11px] font-mono bg-[#1c2433] px-2 py-0.5 rounded border border-[#243044]">
+                          {parser.format}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        <span className="text-[#a5b4fc] text-xs font-mono font-bold">{parser.version}</span>
+                      </td>
+                      <td className="px-4 py-2.5 text-center">
+                        <span className={cn("text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-full border uppercase", getStatusColor(parser.enabled))}>
+                          {parser.enabled ? "Active" : "Disabled"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <span className="text-[#94a3b8] text-xs font-mono">{parser.type}</span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right">
+                        <span className={cn("text-xs font-mono font-bold", parser.accuracy > 0.99 ? "text-[#4ade80]" : parser.accuracy > 0.90 ? "text-[#eab308]" : "text-[#ef4444]")}>
+                          {(parser.accuracy * 100).toFixed(1)}%
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {selectedParser && !error && (
           <div className="w-[420px] bg-[#0a0d12] border-l border-[#1e2d3d] flex flex-col flex-shrink-0 shadow-2xl animate-in slide-in-from-right-8 duration-200 z-20">
-            
+
             <div className="p-5 border-b border-[#1e2d3d] bg-gradient-to-b from-[#1c2433]/30 to-transparent relative">
-              <button 
-                onClick={() => setSelectedParser(null)}
-                className="absolute top-4 right-4 p-1 rounded-full text-[#64748b] hover:bg-[#1e2d3d] hover:text-[#e2e8f0] transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-              
+              <Tooltip content="Close details">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => setSelectedParser(null)}
+                  leftIcon={<X className="w-4 h-4" />}
+                  className="absolute top-3 right-3"
+                >
+                  Close
+                </Button>
+              </Tooltip>
+
               <div className="flex items-center gap-3 mb-2">
                 <div className="w-7 h-7 rounded bg-[#1c2433] border border-[#243044] flex items-center justify-center">
                   <Code2 className="w-3.5 h-3.5 text-[#3b82f6]" />
@@ -207,9 +270,11 @@ export default function ParsersPage() {
                 >
                   Open in Studio
                 </Button>
-                <Button variant="outline" size="sm" className="px-3" title="Compare Versions">
-                  <ArrowLeftRight className="w-4 h-4 text-[#94a3b8]" />
-                </Button>
+                <Tooltip content="Compare parser versions">
+                  <Button variant="outline" size="sm" leftIcon={<ArrowLeftRight className="w-4 h-4 text-[#94a3b8]" />}>
+                    Compare
+                  </Button>
+                </Tooltip>
               </div>
             </div>
 
@@ -217,12 +282,20 @@ export default function ParsersPage() {
 
               <div className="grid grid-cols-2 divide-x divide-y divide-[#1e2d3d] border-b border-[#1e2d3d]">
                 <div className="p-3 flex flex-col items-center justify-center">
-                  <span className="text-[#64748b] text-[9px] uppercase font-bold font-mono tracking-widest mb-1">Confidence Threshold</span>
+                  <MetricLabel label="Confidence Threshold" tooltip="Minimum confidence score required for a parser match." className="text-[#64748b] text-[9px] uppercase font-bold font-mono tracking-widest mb-1" />
                   <span className="text-[#e2e8f0] text-base font-light font-mono">{(selectedParser.confidence_threshold * 100).toFixed(0)}%</span>
                 </div>
                 <div className="p-3 flex flex-col items-center justify-center">
-                  <span className="text-[#64748b] text-[9px] uppercase font-bold font-mono tracking-widest mb-1">Field Mappings</span>
+                  <MetricLabel label="Field Mappings" tooltip="Number of source-to-universal schema field mappings." className="text-[#64748b] text-[9px] uppercase font-bold font-mono tracking-widest mb-1" />
                   <span className="text-[#e2e8f0] text-base font-light font-mono">{selectedParser.field_mappings.length}</span>
+                </div>
+                <div className="p-3 flex flex-col items-center justify-center">
+                  <span className="text-[#64748b] text-[9px] uppercase font-bold font-mono tracking-widest mb-1">Created</span>
+                  <Timestamp iso={selectedParser.created_at} defaultMode="absolute" className="text-[#e2e8f0]" />
+                </div>
+                <div className="p-3 flex flex-col items-center justify-center">
+                  <span className="text-[#64748b] text-[9px] uppercase font-bold font-mono tracking-widest mb-1">Updated</span>
+                  <Timestamp iso={selectedParser.updated_at} defaultMode="absolute" className="text-[#e2e8f0]" />
                 </div>
               </div>
 

@@ -2,9 +2,31 @@ import { useAuthStore } from "../auth-store";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
+export class BackendError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number,
+    public readonly endpoint?: string,
+    public readonly isOffline = false
+  ) {
+    super(message);
+    this.name = "BackendError";
+  }
+}
+
+export function isOfflineError(err: unknown): boolean {
+  return err instanceof BackendError && err.isOffline;
+}
+
+export function getApiErrorMessage(err: unknown): string {
+  if (err instanceof BackendError) return err.message;
+  if (err instanceof Error) return err.message;
+  return "An unexpected error occurred";
+}
+
 async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`;
-  
+
   const token = useAuthStore.getState().token;
   const headers: HeadersInit = {
     "Content-Type": "application/json",
@@ -15,16 +37,42 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
     (headers as Record<string, string>)["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(url, {
-    ...options,
-    headers,
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`API error ${res.status}: ${err}`);
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers,
+    });
+    if (!res.ok) {
+      const err = await res.text().catch(() => "Unknown error");
+      throw new BackendError(
+        res.status >= 500
+          ? `Server error ${res.status} on ${path}. Please try again shortly.`
+          : `API error ${res.status}${err ? `: ${err}` : ""}`,
+        res.status,
+        path,
+        false
+      );
+    }
+    const json = await res.json();
+    return json.data ?? json;
+  } catch (err) {
+    if (err instanceof BackendError) throw err;
+
+    // Network / DNS / CORS / backend offline
+    const isNetworkError =
+      err instanceof TypeError ||
+      (err instanceof Error && /fetch|network|failed|cors/i.test(err.message));
+
+    if (isNetworkError) {
+      throw new BackendError(
+        `Could not connect to backend at ${API_BASE || "API base URL"}. Make sure the backend is running.`,
+        undefined,
+        path,
+        true
+      );
+    }
+    throw err;
   }
-  const json = await res.json();
-  return json.data ?? json;
 }
 
 export { fetchJson, API_BASE };

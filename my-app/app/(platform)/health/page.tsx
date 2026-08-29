@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import {
   HardDrive, AlertCircle, Activity,
@@ -14,6 +15,11 @@ import {
 } from "./data";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
+import { SkeletonBlock } from "@/components/ui/skeleton";
+import { BackendErrorState } from "@/components/ui/error-fallback";
+import { getSystemHealth } from "@/lib/services/health";
+import type { SystemHealth } from "@/lib/types";
+
 
 const getStatusConfig = (status: ServiceStatus) => {
   switch(status) {
@@ -49,7 +55,27 @@ const FlowNode = ({ title, status, metric, subMetric }: { title: string; status:
 };
 
 export default function HealthPage() {
-  
+  const [health, setHealth] = useState<SystemHealth | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const h = await getSystemHealth();
+      setHealth(h);
+      setLastUpdated(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Failed to load system health"));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void fetchData(); }, [fetchData]);
+
   return (
     <div className="flex flex-col h-full bg-[#050709] overflow-y-auto overflow-x-hidden">
       
@@ -58,11 +84,22 @@ export default function HealthPage() {
         description="Operational monitoring of ingestion pipelines, compute clusters, and storage infrastructure."
         actions={
           <div className="flex items-center gap-3">
-            <span className="text-[#94a3b8] text-[10px] font-mono mr-2">Last updated: Just now</span>
-            <Button variant="outline" size="sm" leftIcon={<RotateCw className="w-3.5 h-3.5" />}>Refresh</Button>
+            <span className="text-[#94a3b8] text-[10px] font-mono mr-2" suppressHydrationWarning>
+              {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : "Updating…"}
+            </span>
+            <Button variant="outline" size="sm" leftIcon={<RotateCw className="w-3.5 h-3.5" />} onClick={fetchData}>
+              Refresh
+            </Button>
           </div>
         }
       />
+
+      {error ? (
+        <div className="flex-1 p-6">
+          <BackendErrorState error={error} onRetry={fetchData} />
+        </div>
+      ) : (
+
 
       <div className="p-6 space-y-6 max-w-[1600px] mx-auto w-full">
         
@@ -224,6 +261,7 @@ export default function HealthPage() {
         </div>
 
       </div>
+      )}
     </div>
   );
 }

@@ -6,11 +6,16 @@ import { Button } from "@/components/ui/button";
 import { 
   BrainCircuit, ShieldCheck, Play, CheckCircle2, XCircle, 
   Settings2, Activity, ArrowRight, Sparkles, Server, FileJson, 
-  TerminalSquare, AlertTriangle
+  TerminalSquare, AlertTriangle, Search, RotateCw
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { useRouter } from "next/navigation";
 import { analyzeLog, generateParser, type AIMappingSuggestion } from "@/lib/services/ai";
+import { MetricLabel } from "@/components/ui/tooltip";
+import { BackendErrorState } from "@/components/ui/error-fallback";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
+import { getApiErrorMessage, isOfflineError } from "@/lib/services/api";
 
 type SuggestionStatus = "pending" | "approved" | "rejected";
 
@@ -22,7 +27,7 @@ export default function AIMappingPage() {
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisComplete, setAnalysisComplete] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<Error | null>(null);
   const [detectedFormat, setDetectedFormat] = useState("");
   const [formatConfidence, setFormatConfidence] = useState(0);
   
@@ -30,6 +35,14 @@ export default function AIMappingPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGenerated, setIsGenerated] = useState(false);
   const [generatedParserId, setGeneratedParserId] = useState("");
+
+  const resetAnalysis = () => {
+    setAnalysisComplete(false);
+    setSuggestions([]);
+    setDetectedFormat("");
+    setFormatConfidence(0);
+    setAnalysisError(null);
+  };
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
@@ -43,7 +56,15 @@ export default function AIMappingPage() {
       );
       setAnalysisComplete(true);
     } catch (err) {
-      setAnalysisError(err instanceof Error ? err.message : "Analysis failed");
+      const message = getApiErrorMessage(err);
+      const offline = isOfflineError(err);
+      setAnalysisError(
+        new Error(
+          offline
+            ? "Could not reach the AI service. Make sure the backend is running and try again."
+            : message || "Analysis failed"
+        )
+      );
     } finally {
       setIsAnalyzing(false);
     }
@@ -58,6 +79,7 @@ export default function AIMappingPage() {
 
   const handleGenerate = async () => {
     setIsGenerating(true);
+    setAnalysisError(null);
     try {
       const result = await generateParser(
         rawLog,
@@ -69,7 +91,15 @@ export default function AIMappingPage() {
       setIsGenerating(false);
       setIsGenerated(true);
     } catch (err) {
-      setAnalysisError(err instanceof Error ? err.message : "Parser generation failed");
+      const message = getApiErrorMessage(err);
+      const offline = isOfflineError(err);
+      setAnalysisError(
+        new Error(
+          offline
+            ? "Could not reach the backend to generate the parser. Please start the backend and retry."
+            : message || "Parser generation failed"
+        )
+      );
       setIsGenerating(false);
     }
   };
@@ -124,8 +154,8 @@ export default function AIMappingPage() {
     <div className="flex flex-col h-full bg-[#050709] overflow-hidden">
       
       <PageHeader 
-        title="AI Copilot" 
-        description="AI-assisted semantic log analysis and parser synthesis."
+        title="AI Mapping Assistant" 
+        description="Paste a raw log and the assistant suggests how its fields map to the common schema."
         badge={
           <div className="flex items-center gap-2 bg-[#0a0d12] border border-[#1e2d3d] px-2.5 py-1 rounded-md">
             <Server className="w-3.5 h-3.5 text-[#8b5cf6]" />
@@ -158,11 +188,13 @@ export default function AIMappingPage() {
             </div>
             
             {analysisError && (
-              <div className="px-4 py-2 bg-[#450a0a]/30 border-t border-[#ef4444]/20">
-                <div className="flex items-center gap-2 text-[#fca5a5] text-xs">
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  {analysisError}
-                </div>
+              <div className="px-4 py-3 bg-[#450a0a]/30 border-t border-[#ef4444]/20">
+                <BackendErrorState
+                  title={isOfflineError(analysisError) ? "Backend offline" : "Analysis failed"}
+                  error={analysisError}
+                  onRetry={handleAnalyze}
+                  className="py-4"
+                />
               </div>
             )}
             
@@ -178,15 +210,10 @@ export default function AIMappingPage() {
                 </Button>
               ) : (
                 <Button 
-                  onClick={() => {
-                    setAnalysisComplete(false);
-                    setSuggestions([]);
-                    setDetectedFormat("");
-                    setFormatConfidence(0);
-                    setAnalysisError(null);
-                  }} 
+                  onClick={resetAnalysis}
                   variant="outline"
                   className="w-full"
+                  leftIcon={<RotateCw className="w-4 h-4" />}
                 >
                   Reset Analysis
                 </Button>
@@ -202,20 +229,18 @@ export default function AIMappingPage() {
 
             <div className="flex-1 p-8">
                {!analysisComplete && !isAnalyzing && (
-                 <div className="h-full flex flex-col items-center justify-center text-[#64748b] gap-4">
-                   <div className="w-16 h-16 rounded-full border border-[#1e2d3d] flex items-center justify-center bg-[#050709]">
-                     <Activity className="w-6 h-6 text-[#374151]" />
-                   </div>
-                   <p className="text-sm font-mono italic">Awaiting payload for analysis.</p>
-                 </div>
+                 <EmptyState
+                   title="Ready to analyze"
+                   description="Paste a log on the left and start analysis to see field mappings."
+                   icon={<Activity className="w-8 h-8" />}
+                 />
                )}
 
                {isAnalyzing && (
-                 <div className="h-full flex flex-col items-center justify-center text-[#64748b] gap-4">
-                   <div className="w-16 h-16 rounded-full border border-[#8b5cf6]/30 flex items-center justify-center bg-[#050709]">
-                     <div className="w-8 h-8 border-2 border-[#8b5cf6]/20 border-t-[#8b5cf6] rounded-full animate-spin" />
-                   </div>
-                   <p className="text-sm font-mono">Analyzing with AI...</p>
+                 <div className="h-full flex flex-col justify-center gap-6">
+                   <Skeleton className="h-16 w-full bg-[#1c2433]" />
+                   <Skeleton className="h-16 w-full bg-[#1c2433]" />
+                   <Skeleton className="h-16 w-full bg-[#1c2433]" />
                  </div>
                )}
 
@@ -228,8 +253,12 @@ export default function AIMappingPage() {
                      <div>
                        <h3 className="text-[#e2e8f0] text-sm font-semibold mb-1">Format Detection</h3>
                        <p className="text-[#94a3b8] text-xs font-mono leading-relaxed">
-                         Detected format: <span className="text-[#4ade80]">{detectedFormat}</span>. 
-                         Confidence: {formatConfidence.toFixed(1)}%.
+                         Detected format: <span className="text-[#4ade80]">{detectedFormat}</span>.{" "}
+                         <MetricLabel 
+                           label={`Confidence: ${formatConfidence.toFixed(1)}%`} 
+                           tooltip="How certain the model is that it identified the correct log format." 
+                           className="text-[#94a3b8] text-xs font-mono"
+                         />
                        </p>
                      </div>
                    </div>
@@ -253,7 +282,7 @@ export default function AIMappingPage() {
                      <div>
                        <h3 className="text-[#e2e8f0] text-sm font-semibold mb-1">Schema Alignment</h3>
                        <p className="text-[#94a3b8] text-xs font-mono leading-relaxed">
-                         Generated {suggestions.length} high-confidence mapping suggestions against ULPF Universal Schema. Ready for human review.
+                         Generated {suggestions.length} high-confidence mapping suggestions against the common schema. Ready for human review.
                        </p>
                      </div>
                    </div>
@@ -277,13 +306,24 @@ export default function AIMappingPage() {
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {!analysisComplete ? (
-                <div className="h-full flex items-center justify-center text-[#64748b] text-sm font-mono italic">
-                  Run analysis to generate suggestions.
-                </div>
+                <EmptyState
+                  title="No suggestions yet"
+                  description="Run the analysis to generate mapping suggestions for this log."
+                  icon={<Search className="w-8 h-8" />}
+                />
+              ) : isAnalyzing ? (
+                <SkeletonBlock rows={4} />
               ) : suggestions.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-[#64748b] text-sm font-mono italic">
-                  No mapping suggestions generated. Try a different log format.
-                </div>
+                <EmptyState
+                  title="No mapping suggestions"
+                  description="The assistant did not find any clear field matches for this log. Try a different sample or edit the payload."
+                  icon={<AlertTriangle className="w-8 h-8" />}
+                  action={
+                    <Button variant="outline" size="sm" onClick={resetAnalysis} leftIcon={<RotateCw className="w-3.5 h-3.5" />}>
+                      Try Another Log
+                    </Button>
+                  }
+                />
               ) : (
                 suggestions.map((s, idx) => (
                   <div 
@@ -298,17 +338,21 @@ export default function AIMappingPage() {
                   >
                      <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <div className="bg-[#050709] border border-[#243044] px-2 py-1 rounded text-[#e2e8f0] text-xs font-mono font-bold">{s.source_field}</div>
+                          <div className="bg-[#050709] border border-[#243044] px-2 py-1 rounded text-[#e2e8f0] text-xs font-mono font-bold" title="Field name in the raw log">
+                            {s.source_field}
+                          </div>
                           <ArrowRight className="w-3.5 h-3.5 text-[#64748b]" />
                           <div className={cn("px-2 py-1 rounded text-xs font-mono font-bold", 
                              s.status === "approved" ? "bg-[#22c55e]/20 text-[#4ade80]" : "bg-[#8b5cf6]/20 text-[#c4b5fd]"
-                          )}>
+                          )} title="Matching field in the common schema">
                              {s.target_field}
                           </div>
                         </div>
-                        <div className="text-[10px] font-mono font-bold flex items-center gap-1 border rounded px-1.5 py-0.5 border-[#22c55e]/30 text-[#4ade80] bg-[#052e16]">
-                           {s.confidence}%
-                        </div>
+                        <MetricLabel 
+                          label={`${(s.confidence * 100).toFixed(0)}%`} 
+                          tooltip="How likely this mapping is correct, based on field names and sample values."
+                          className="text-[10px] font-mono font-bold flex items-center gap-1 border rounded px-1.5 py-0.5 border-[#22c55e]/30 text-[#4ade80] bg-[#052e16]"
+                        />
                      </div>
                      
                      <div className="text-[#94a3b8] text-[10px] font-mono mb-4 border-l-2 border-[#1e2d3d] pl-2">

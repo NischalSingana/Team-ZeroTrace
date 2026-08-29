@@ -2,12 +2,18 @@
 
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { PageHeader } from "@/components/layout/page-header";
 import { SeverityBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Timestamp } from "@/components/ui/timestamp";
 import { Kbd } from "@/components/ui/kbd";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BackendErrorState } from "@/components/ui/error-fallback";
+import { Tooltip, MetricLabel } from "@/components/ui/tooltip";
+import { SkeletonBlock, Skeleton } from "@/components/ui/skeleton";
 import { searchEvents } from "@/lib/services/events";
 import { fetchSources } from "@/lib/services/sources";
+import { isOfflineError } from "@/lib/services/api";
 import {
   formatNumber,
 } from "@/lib/utils/format";
@@ -29,6 +35,8 @@ import {
   Download,
   X,
   Terminal,
+  ArrowRight,
+  FileSearch,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { EventInspectorPane } from "./inspector";
@@ -40,6 +48,7 @@ const FORMATS = ["json_lines", "syslog_rfc3164", "syslog_rfc5424", "cef", "leef"
 // ── Sort header ──────────────────────────────────────────────────
 function SortHeader({
   label,
+  tooltip,
   field,
   currentSort,
   currentDir,
@@ -47,6 +56,7 @@ function SortHeader({
   className,
 }: {
   label: string;
+  tooltip: string;
   field: string;
   currentSort: string;
   currentDir: "asc" | "desc";
@@ -64,7 +74,7 @@ function SortHeader({
         className
       )}
     >
-      {label}
+      <MetricLabel label={label} tooltip={tooltip} />
       {active ? (
         currentDir === "desc" ? (
           <ChevronDown className="w-2.5 h-2.5" />
@@ -109,9 +119,11 @@ function EventTableRow({
         <SeverityBadge severity={event.severity} size="xs" />
       </td>
       <td className="py-1.5 px-3 align-middle max-w-[120px]">
-        <span className="text-[#94a3b8] text-xs truncate block font-mono">
-          {event.source_name.split("—")[0].trim()}
-        </span>
+        <Tooltip content={event.source_name}>
+          <span className="text-[#94a3b8] text-xs truncate block font-mono">
+            {event.source_name.split("—")[0].trim()}
+          </span>
+        </Tooltip>
       </td>
       <td className="py-1.5 px-3 align-middle max-w-[150px]">
         <span className="text-[#e2e8f0] text-xs font-mono truncate block">
@@ -119,19 +131,25 @@ function EventTableRow({
         </span>
       </td>
       <td className="py-1.5 px-3 align-middle">
-        <span className="text-[#64748b] text-xs font-mono truncate block max-w-[120px]">
-          {event.actor.user ?? event.actor.ip ?? "—"}
-        </span>
+        <Tooltip content={event.actor.user ?? event.actor.ip ?? "No actor available"}>
+          <span className="text-[#64748b] text-xs font-mono truncate block max-w-[120px]">
+            {event.actor.user ?? event.actor.ip ?? "—"}
+          </span>
+        </Tooltip>
       </td>
       <td className="py-1.5 px-3 align-middle">
-        <span className="text-[#64748b] text-xs font-mono truncate block max-w-[120px]">
-          {event.target.ip ?? "—"}
-        </span>
+        <Tooltip content={event.target.ip ?? "No destination IP available"}>
+          <span className="text-[#64748b] text-xs font-mono truncate block max-w-[120px]">
+            {event.target.ip ?? "—"}
+          </span>
+        </Tooltip>
       </td>
       <td className="py-1.5 px-3 align-middle">
-        <span className="text-[#3b82f6] text-[10px] font-mono truncate block max-w-[120px]">
-          {event.parser_id.replace("parser_", "")}
-        </span>
+        <Tooltip content={event.parser_id}>
+          <span className="text-[#3b82f6] text-[10px] font-mono truncate block max-w-[120px]">
+            {event.parser_id.replace("parser_", "")}
+          </span>
+        </Tooltip>
       </td>
       <td className="py-1.5 px-3 align-middle">
         <div className="flex items-center gap-1.5">
@@ -159,10 +177,11 @@ function FilterChip({
       <button
         type="button"
         onClick={onRemove}
-        className="text-[#64748b] hover:text-[#e2e8f0] ml-0.5 transition-colors"
+        className="inline-flex items-center gap-0.5 text-[#64748b] hover:text-[#e2e8f0] ml-0.5 transition-colors"
         aria-label={`Remove filter: ${label}`}
       >
         <X className="w-2.5 h-2.5" />
+        <span className="text-[9px]">Remove</span>
       </button>
     </span>
   );
@@ -193,6 +212,8 @@ function ExplorerInner() {
   const [queryMs, setQueryMs] = useState(0);
   const [loading, setLoading] = useState(true);
   const [sources, setSources] = useState<LogSource[]>([]);
+  const [sourcesLoading, setSourcesLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   
   // Selected event for split pane
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -201,30 +222,46 @@ function ExplorerInner() {
 
   const doSearch = useCallback(async () => {
     setLoading(true);
-    const query: SearchQuery = {
-      text: searchText || undefined,
-      filters: [],
-      time_range: "24h",
-      severity: selectedSeverities.length > 0 ? selectedSeverities : undefined,
-      source_ids: selectedSourceIds.length > 0 ? selectedSourceIds : undefined,
-      categories: selectedCategories.length > 0 ? selectedCategories : undefined,
-      page,
-      page_size: PAGE_SIZE,
-      sort_by: sortBy,
-      sort_dir: sortDir,
-    };
-    const res = await searchEvents(query);
-    setResults(res.events);
-    setTotal(res.total);
-    setQueryMs(res.query_ms);
-    setLoading(false);
+    setError(null);
+    try {
+      const query: SearchQuery = {
+        text: searchText || undefined,
+        filters: [],
+        time_range: "24h",
+        severity: selectedSeverities.length > 0 ? selectedSeverities : undefined,
+        source_ids: selectedSourceIds.length > 0 ? selectedSourceIds : undefined,
+        categories: selectedCategories.length > 0 ? selectedCategories : undefined,
+        page,
+        page_size: PAGE_SIZE,
+        sort_by: sortBy,
+        sort_dir: sortDir,
+      };
+      const res = await searchEvents(query);
+      setResults(res.events);
+      setTotal(res.total);
+      setQueryMs(res.query_ms);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setLoading(false);
+    }
   }, [searchText, selectedSeverities, selectedCategories, selectedSourceIds, page, sortBy, sortDir]);
+
+  const loadSources = useCallback(async () => {
+    setSourcesLoading(true);
+    try {
+      const srcs = await fetchSources();
+      setSources(srcs);
+    } finally {
+      setSourcesLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async search; state updates happen after await
     void doSearch();
   }, [doSearch]);
-  useEffect(() => { fetchSources().then(setSources); }, []);
+  useEffect(() => { void loadSources(); }, [loadSources]);
 
   // Keyboard shortcut: / to focus search
   useEffect(() => {
@@ -253,33 +290,49 @@ function ExplorerInner() {
     setPage(0);
   };
 
+  const clearFilters = () => {
+    setSelectedSeverities([]);
+    setSelectedCategories([]);
+    setSelectedSourceIds([]);
+    setSelectedFormats([]);
+    setSelectedOutcomes([]);
+    setSearchText("");
+    setPage(0);
+  };
+
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const activeFiltersCount = selectedSeverities.length + selectedCategories.length + selectedSourceIds.length + selectedFormats.length + selectedOutcomes.length;
   const selectedEvent = results.find(e => e.id === selectedEventId) || null;
 
+  const errorTitle = isOfflineError(error)
+    ? "Backend is offline"
+    : "Failed to search events";
+  const errorDescription = isOfflineError(error)
+    ? "Could not reach the ZeroTrace API. Start the backend service and try again."
+    : "Could not run the search query. Check the backend status and retry.";
+
   return (
     <div className="flex flex-col h-full bg-[#050709] overflow-hidden">
       {/* ── Page Header ─────────────────────────────────────────── */}
-      <div className="px-6 py-4 border-b border-[#1e2d3d] bg-[#080b0f] flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <Terminal className="w-5 h-5 text-[#3b82f6]" />
-          <div>
-            <h1 className="text-lg font-semibold text-[#e2e8f0] tracking-tight">Log Explorer</h1>
-            <p className="text-[#64748b] text-xs">High-density investigation environment.</p>
+      <PageHeader
+        title="Log Explorer"
+        description="Search, filter, and inspect normalized events across all sources."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="xs" leftIcon={<Download className="w-3 h-3" />}>
+              Export All
+            </Button>
+            <Button
+              variant={filterOpen ? "subtle" : "ghost"}
+              size="xs"
+              onClick={() => setFilterOpen(!filterOpen)}
+              leftIcon={<Filter className="w-3 h-3" />}
+            >
+              Filters {activeFiltersCount > 0 && `(${activeFiltersCount})`}
+            </Button>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="xs" leftIcon={<Download className="w-3 h-3" />}>Export All</Button>
-          <Button
-            variant={filterOpen ? "subtle" : "ghost"}
-            size="xs"
-            onClick={() => setFilterOpen(!filterOpen)}
-            leftIcon={<Filter className="w-3 h-3" />}
-          >
-            Filters {activeFiltersCount > 0 && `(${activeFiltersCount})`}
-          </Button>
-        </div>
-      </div>
+        }
+      />
 
       {/* ── Search Bar ──────────────────────────────────────────── */}
       <div className="px-6 py-4 border-b border-[#1e2d3d] bg-[#050709] flex-shrink-0">
@@ -330,13 +383,7 @@ function ExplorerInner() {
               ))}
               <button
                 type="button"
-                onClick={() => {
-                  setSelectedSeverities([]);
-                  setSelectedCategories([]);
-                  setSelectedSourceIds([]);
-                  setSelectedFormats([]);
-                  setSelectedOutcomes([]);
-                }}
+                onClick={clearFilters}
                 className="text-[#64748b] hover:text-[#e2e8f0] text-[10px] font-mono transition-colors ml-2 border border-transparent hover:border-[#1e2d3d] rounded px-1"
               >
                 Clear all
@@ -410,21 +457,34 @@ function ExplorerInner() {
             {/* Source */}
             <div>
               <div className="text-[#94a3b8] text-[10px] font-semibold uppercase tracking-widest mb-3">Source</div>
-              <div className="space-y-1.5">
-                {sources.slice(0, 8).map((src) => (
-                  <label key={src.id} className="flex items-center gap-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={selectedSourceIds.includes(src.id)}
-                      onChange={() => toggleFilter(setSelectedSourceIds, src.id)}
-                      className="w-3.5 h-3.5 rounded border border-[#243044] bg-[#0d1117] accent-[#3b82f6] cursor-pointer"
-                    />
-                    <span className="text-[#94a3b8] group-hover:text-[#e2e8f0] text-xs font-mono truncate transition-colors">
-                      {src.name.split("—")[0].trim()}
-                    </span>
-                  </label>
-                ))}
-              </div>
+              {sourcesLoading ? (
+                <div className="space-y-2">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-4 w-full" />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {sources.slice(0, 8).map((src) => (
+                    <label key={src.id} className="flex items-center gap-2 cursor-pointer group">
+                      <input
+                        type="checkbox"
+                        checked={selectedSourceIds.includes(src.id)}
+                        onChange={() => toggleFilter(setSelectedSourceIds, src.id)}
+                        className="w-3.5 h-3.5 rounded border border-[#243044] bg-[#0d1117] accent-[#3b82f6] cursor-pointer"
+                      />
+                      <Tooltip content={src.name}>
+                        <span className="text-[#94a3b8] group-hover:text-[#e2e8f0] text-xs font-mono truncate transition-colors">
+                          {src.name.split("—")[0].trim()}
+                        </span>
+                      </Tooltip>
+                    </label>
+                  ))}
+                  {sources.length === 0 && (
+                    <div className="text-[#64748b] text-xs font-mono">No sources found</div>
+                  )}
+                </div>
+              )}
             </div>
           </aside>
         )}
@@ -451,68 +511,121 @@ function ExplorerInner() {
 
           {/* Table Container */}
           <div className="flex-1 overflow-auto">
-            <table className="w-full border-collapse" role="grid">
-              <thead className="sticky top-0 z-10">
-                <tr className="bg-[#050709] border-b border-[#1e2d3d]">
-                  <th className="py-2 px-3 text-left w-36 whitespace-nowrap">
-                    <SortHeader label="Timestamp" field="timestamp" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} />
-                  </th>
-                  <th className="py-2 px-3 text-left w-20 whitespace-nowrap">
-                    <SortHeader label="Sev." field="severity" currentSort={sortBy} currentDir={sortDir} onSort={handleSort} />
-                  </th>
-                  <th className="py-2 px-3 text-left w-32 whitespace-nowrap">
-                    <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest">Source</span>
-                  </th>
-                  <th className="py-2 px-3 text-left whitespace-nowrap">
-                    <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest">Event Action</span>
-                  </th>
-                  <th className="py-2 px-3 text-left w-32 whitespace-nowrap">
-                    <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest">User/Src IP</span>
-                  </th>
-                  <th className="py-2 px-3 text-left w-32 whitespace-nowrap">
-                    <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest">Dest IP</span>
-                  </th>
-                  <th className="py-2 px-3 text-left w-28 whitespace-nowrap">
-                    <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest">Parser</span>
-                  </th>
-                  <th className="py-2 px-3 text-left w-24 whitespace-nowrap">
-                    <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest">Status</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="text-xs">
-                {loading ? (
-                  Array.from({ length: 25 }).map((_, i) => (
-                    <tr key={i} className="border-b border-[#1e2d3d]/30">
-                      {Array.from({ length: 8 }).map((__, j) => (
-                        <td key={j} className="py-2.5 px-3">
-                          <div className="h-2 rounded bg-[#1e2d3d]/50 animate-pulse" style={{ width: `${[65, 42, 78, 35, 58, 48, 70, 52][(i + j) % 8]}%` }} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : results.length === 0 ? (
-                  <tr>
-                    <td colSpan={8}>
-                      <div className="flex flex-col items-center justify-center py-32 gap-3">
-                        <Search className="w-8 h-8 text-[#1e2d3d]" />
-                        <div className="text-[#94a3b8] text-sm font-medium">No events found matching your query</div>
-                        <div className="text-[#64748b] text-xs font-mono">Try adjusting your time range or filters</div>
-                      </div>
-                    </td>
+            {error ? (
+              <BackendErrorState
+                error={error}
+                onRetry={doSearch}
+                title={errorTitle}
+                description={errorDescription}
+                className="h-full"
+              />
+            ) : (
+              <table className="w-full border-collapse" role="grid">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-[#050709] border-b border-[#1e2d3d]">
+                    <th className="py-2 px-3 text-left w-36 whitespace-nowrap">
+                      <SortHeader
+                        label="Timestamp"
+                        tooltip="Original event time"
+                        field="timestamp"
+                        currentSort={sortBy}
+                        currentDir={sortDir}
+                        onSort={handleSort}
+                      />
+                    </th>
+                    <th className="py-2 px-3 text-left w-24 whitespace-nowrap">
+                      <SortHeader
+                        label="Severity"
+                        tooltip="Event severity level"
+                        field="severity"
+                        currentSort={sortBy}
+                        currentDir={sortDir}
+                        onSort={handleSort}
+                      />
+                    </th>
+                    <th className="py-2 px-3 text-left w-32 whitespace-nowrap">
+                      <MetricLabel
+                        label="Source"
+                        tooltip="Log source that produced the event"
+                        className="text-[#374151] text-[9px] font-mono uppercase tracking-widest"
+                      />
+                    </th>
+                    <th className="py-2 px-3 text-left whitespace-nowrap">
+                      <MetricLabel
+                        label="Event Action"
+                        tooltip="Normalized action extracted from the event"
+                        className="text-[#374151] text-[9px] font-mono uppercase tracking-widest"
+                      />
+                    </th>
+                    <th className="py-2 px-3 text-left w-32 whitespace-nowrap">
+                      <MetricLabel
+                        label="User / Source IP"
+                        tooltip="Actor user or source IP address"
+                        className="text-[#374151] text-[9px] font-mono uppercase tracking-widest"
+                      />
+                    </th>
+                    <th className="py-2 px-3 text-left w-32 whitespace-nowrap">
+                      <MetricLabel
+                        label="Destination IP"
+                        tooltip="Target IP address"
+                        className="text-[#374151] text-[9px] font-mono uppercase tracking-widest"
+                      />
+                    </th>
+                    <th className="py-2 px-3 text-left w-28 whitespace-nowrap">
+                      <MetricLabel
+                        label="Parser"
+                        tooltip="Parser used to normalize the event"
+                        className="text-[#374151] text-[9px] font-mono uppercase tracking-widest"
+                      />
+                    </th>
+                    <th className="py-2 px-3 text-left w-24 whitespace-nowrap">
+                      <MetricLabel
+                        label="Status"
+                        tooltip="Overall processing status for this event"
+                        className="text-[#374151] text-[9px] font-mono uppercase tracking-widest"
+                      />
+                    </th>
                   </tr>
-                ) : (
-                  results.map((event) => (
-                    <EventTableRow
-                      key={event.id}
-                      event={event}
-                      selected={selectedEventId === event.id}
-                      onSelect={() => setSelectedEventId(prev => prev === event.id ? null : event.id)}
-                    />
-                  ))
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="text-xs">
+                  {loading ? (
+                    Array.from({ length: 25 }).map((_, i) => (
+                      <tr key={i} className="border-b border-[#1e2d3d]/30">
+                        {Array.from({ length: 8 }).map((__, j) => (
+                          <td key={j} className="py-2.5 px-3">
+                            <div className="h-2 rounded bg-[#1e2d3d]/50 animate-pulse" style={{ width: `${[65, 42, 78, 35, 58, 48, 70, 52][(i + j) % 8]}%` }} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : results.length === 0 ? (
+                    <tr>
+                      <td colSpan={8}>
+                        <EmptyState
+                          title="No events found"
+                          description="Try adjusting your time range, search query, or filters."
+                          icon={<FileSearch className="w-8 h-8" />}
+                          action={
+                            <Button variant="outline" size="xs" onClick={clearFilters} leftIcon={<X className="w-3 h-3" />}>
+                              Clear filters
+                            </Button>
+                          }
+                        />
+                      </td>
+                    </tr>
+                  ) : (
+                    results.map((event) => (
+                      <EventTableRow
+                        key={event.id}
+                        event={event}
+                        selected={selectedEventId === event.id}
+                        onSelect={() => setSelectedEventId(prev => prev === event.id ? null : event.id)}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
 
           {/* Pagination Footer */}
@@ -530,7 +643,7 @@ function ExplorerInner() {
                 leftIcon={<ChevronLeft className="w-3 h-3" />}
                 className="bg-[#0d1117]"
               >
-                Prev
+                Previous
               </Button>
               <Button
                 variant="outline"

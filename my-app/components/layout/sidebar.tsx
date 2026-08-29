@@ -80,9 +80,26 @@ const NAV_GROUPS: NavGroup[] = [
   },
 ];
 
+// Flatten nav for active-state calculation
+const ALL_NAV_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
+
+function getActiveHref(pathname: string): string | null {
+  // Exact match wins
+  const exact = ALL_NAV_ITEMS.find((item) => item.href === pathname);
+  if (exact) return exact.href;
+
+  // Longest prefix match for nested routes (e.g. /sources/[id] -> /sources)
+  const matching = ALL_NAV_ITEMS.filter((item) => pathname.startsWith(item.href + "/"));
+  if (matching.length === 0) return null;
+  return matching.reduce((longest, item) =>
+    item.href.length > longest.href.length ? item : longest
+  ).href;
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
+  const activeHref = getActiveHref(pathname);
 
   return (
     <aside
@@ -130,9 +147,7 @@ export function Sidebar() {
             )}
             {group.items.map((item) => {
               const Icon = item.icon;
-              const active =
-                pathname === item.href ||
-                (item.href !== "/overview" && pathname.startsWith(item.href));
+              const active = activeHref === item.href;
 
               return (
                 <Link

@@ -5,9 +5,12 @@ import { PageHeader } from "@/components/layout/page-header";
 import { MetricCard } from "@/components/ui/metric-card";
 import { SeverityBadge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/ui/status-dot";
-import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonBlock, SkeletonMetric } from "@/components/ui/skeleton";
 import { Timestamp } from "@/components/ui/timestamp";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BackendErrorState } from "@/components/ui/error-fallback";
+import { Tooltip, MetricLabel } from "@/components/ui/tooltip";
 import { getRecentEvents } from "@/lib/services/events";
 import { getPipelineMetrics } from "@/lib/services/pipeline";
 import { getAnomalyAlerts } from "@/lib/services/health";
@@ -18,6 +21,7 @@ import {
   getProcessingErrors,
 } from "@/lib/services/analytics";
 import { fetchSources } from "@/lib/services/sources";
+import { isOfflineError } from "@/lib/services/api";
 import { useUIStore } from "@/lib/store/ui";
 import { useInterval } from "@/lib/utils/hooks";
 import { formatNumber, formatRate, formatPercent, formatDuration } from "@/lib/utils/format";
@@ -34,7 +38,9 @@ import {
   Zap,
   RefreshCw,
   Activity,
-  ServerCrash
+  ServerCrash,
+  Inbox,
+  FileSearch,
 } from "lucide-react";
 
 // ── Stage color map ──────────────────────────────────────────────
@@ -51,13 +57,24 @@ const STAGE_COLORS: Record<string, string> = {
 
 const STAGE_LABELS: Record<string, string> = {
   ingest: "Ingest",
-  format_detection: "Format Det.",
+  format_detection: "Format Detection",
   parser_match: "Parser Match",
-  field_extraction: "Extraction",
-  normalization: "Normalize",
-  schema_validation: "Validate",
-  enrichment: "Enrich",
+  field_extraction: "Field Extraction",
+  normalization: "Normalization",
+  schema_validation: "Schema Validation",
+  enrichment: "Enrichment",
   output: "Output",
+};
+
+const STAGE_TOOLTIPS: Record<string, string> = {
+  ingest: "Raw logs received from configured sources.",
+  format_detection: "Identify the incoming log format (syslog, JSON, CEF, etc.).",
+  parser_match: "Match the event against the best-fitting parser.",
+  field_extraction: "Extract key-value fields from the raw event.",
+  normalization: "Map extracted fields to the universal event schema.",
+  schema_validation: "Validate that required schema fields are present.",
+  enrichment: "Add context from threat intel, assets, and identity data.",
+  output: "Write normalized events to downstream storage and SIEMs.",
 };
 
 // ── Severity Row ─────────────────────────────────────────────────
@@ -132,9 +149,13 @@ function PipelineStageBar({ stage }: { stage: PipelineMetrics["stages"][0] }) {
 
   return (
     <div className="flex items-center gap-3 py-2 px-4 border-b border-[#1e2d3d]/50 hover:bg-[#0d1117] transition-colors">
-      <div className="flex items-center gap-2 w-28 flex-shrink-0">
+      <div className="flex items-center gap-2 w-32 flex-shrink-0">
         {statusIcon[stage.status]}
-        <span className="text-[#94a3b8] text-[10px] font-mono">{STAGE_LABELS[stage.stage]}</span>
+        <Tooltip content={STAGE_TOOLTIPS[stage.stage] ?? stage.stage}>
+          <span className="text-[#94a3b8] text-[10px] font-mono truncate">
+            {STAGE_LABELS[stage.stage]}
+          </span>
+        </Tooltip>
       </div>
       {/* Throughput bar */}
       <div className="flex-1 h-1.5 bg-[#1c2433] rounded-full overflow-hidden">
@@ -147,21 +168,27 @@ function PipelineStageBar({ stage }: { stage: PipelineMetrics["stages"][0] }) {
           }}
         />
       </div>
-      <span
-        className="text-[10px] font-mono w-14 text-right flex-shrink-0"
-        style={{ color }}
-      >
-        {formatRate(stage.events_per_sec)}
-      </span>
-      <span className="text-[#64748b] text-[10px] font-mono w-16 text-right flex-shrink-0 hidden lg:block">
-        {formatDuration(stage.avg_latency_ms)}
-      </span>
-      <span
-        className="text-[10px] font-mono w-12 text-right flex-shrink-0 hidden xl:block"
-        style={{ color: stage.error_rate > 0.005 ? "#eab308" : "#374151" }}
-      >
-        {(stage.error_rate * 100).toFixed(2)}%
-      </span>
+      <Tooltip content="Events processed per second at this stage">
+        <span
+          className="text-[10px] font-mono w-14 text-right flex-shrink-0"
+          style={{ color }}
+        >
+          {formatRate(stage.events_per_sec)}
+        </span>
+      </Tooltip>
+      <Tooltip content="Average time spent processing an event at this stage">
+        <span className="text-[#64748b] text-[10px] font-mono w-16 text-right flex-shrink-0 hidden lg:block">
+          {formatDuration(stage.avg_latency_ms)}
+        </span>
+      </Tooltip>
+      <Tooltip content="Percentage of events that failed at this stage">
+        <span
+          className="text-[10px] font-mono w-12 text-right flex-shrink-0 hidden xl:block"
+          style={{ color: stage.error_rate > 0.005 ? "#eab308" : "#374151" }}
+        >
+          {(stage.error_rate * 100).toFixed(2)}%
+        </span>
+      </Tooltip>
     </div>
   );
 }
@@ -214,35 +241,43 @@ export default function OverviewPage() {
   const [throughputData, setThroughputData] = useState<ThroughputPoint[]>([]);
   const [errors, setErrors] = useState<ProcessingError[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
-    const [evts, pipe, alts, srcs, vol, crit, thru, errs] = await Promise.all([
-      getRecentEvents(20),
-      getPipelineMetrics(),
-      getAnomalyAlerts(),
-      fetchSources(),
-      getEventVolume("1h"),
-      getCriticalEvents("1h"),
-      getThroughput("1h"),
-      getProcessingErrors(15),
-    ]);
-    setEvents((prev) => {
-      const prevIds = new Set(prev.map((e) => e.id));
-      const newIds = new Set(evts.filter((e) => !prevIds.has(e.id)).map((e) => e.id));
-      if (newIds.size > 0) setNewEventIds(newIds);
-      return evts;
-    });
-    setPipeline(pipe);
-    setAlerts(alts);
-    setSources(srcs.slice(0, 8));
-    setVolumeData(vol.slice(-30).map((p) => p.value));
-    setCriticalData(crit.slice(-30).map((p) => p.value));
-    setThroughputData(thru);
-    setErrors(errs);
-    setLastRefresh(new Date());
-    setLoading(false);
+    setLoading(true);
+    setError(null);
+    try {
+      const [evts, pipe, alts, srcs, vol, crit, thru, errs] = await Promise.all([
+        getRecentEvents(20),
+        getPipelineMetrics(),
+        getAnomalyAlerts(),
+        fetchSources(),
+        getEventVolume("1h"),
+        getCriticalEvents("1h"),
+        getThroughput("1h"),
+        getProcessingErrors(15),
+      ]);
+      setEvents((prev) => {
+        const prevIds = new Set(prev.map((e) => e.id));
+        const newIds = new Set(evts.filter((e) => !prevIds.has(e.id)).map((e) => e.id));
+        if (newIds.size > 0) setNewEventIds(newIds);
+        return evts;
+      });
+      setPipeline(pipe);
+      setAlerts(alts);
+      setSources(srcs.slice(0, 8));
+      setVolumeData(vol.slice(-30).map((p) => p.value));
+      setCriticalData(crit.slice(-30).map((p) => p.value));
+      setThroughputData(thru);
+      setErrors(errs);
+      setLastRefresh(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   // Initial data load
@@ -266,11 +301,18 @@ export default function OverviewPage() {
   const totalEventsPerSec = pipeline?.total_events_per_sec ?? 0;
   const parseRate = pipeline?.parse_success_rate ?? 0;
 
+  const errorTitle = isOfflineError(error)
+    ? "Backend is offline"
+    : "Failed to load overview";
+  const errorDescription = isOfflineError(error)
+    ? "Could not reach the ZeroTrace API. Start the backend service and try again."
+    : "Could not load dashboard data. Check the backend status and retry.";
+
   return (
     <div className="flex flex-col h-full">
       <PageHeader
         title="Overview"
-        description="System status, pipeline health, and recent activity"
+        description="System status, pipeline health, and recent activity across all log sources."
         actions={
           <div className="flex items-center gap-2">
             <span
@@ -291,299 +333,424 @@ export default function OverviewPage() {
         }
       />
 
-      {/* ── System Metric Strip ──────────────────────────────────── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-px bg-[#1e2d3d] border-b border-[#1e2d3d]">
-        {loading ? (
-          Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-[#080b0f] p-3">
-              <Skeleton className="h-2 w-16 mb-2" />
-              <Skeleton className="h-5 w-20" />
-            </div>
-          ))
-        ) : (
-          <>
-            <MetricCard
-              label="Events / sec"
-              value={formatNumber(totalEventsPerSec)}
-              delta={8.4}
-              sparkData={volumeData}
-              sparkColor="#3b82f6"
-              className="rounded-none border-none"
-            />
-            <MetricCard
-              label="Events today"
-              value={formatNumber(pipeline?.total_events_today ?? 0)}
-              delta={12.1}
-              className="rounded-none border-none"
-            />
-            <MetricCard
-              label="Parse success"
-              value={formatPercent(parseRate)}
-              delta={0.2}
-              sparkData={[98.4, 98.5, 98.3, 98.6, 98.7, 98.4, 98.5]}
-              sparkColor="#22c55e"
-              valueColor={parseRate > 0.98 ? "#86efac" : parseRate > 0.95 ? "#fde68a" : "#fca5a5"}
-              className="rounded-none border-none"
-            />
-            <MetricCard
-              label="Critical events"
-              value={formatNumber(criticalData.reduce((a, b) => a + b, 0))}
-              delta={89.4}
-              sparkData={criticalData}
-              sparkColor="#ef4444"
-              valueColor="#fca5a5"
-              className="rounded-none border-none"
-            />
-            <MetricCard
-              label="Kafka lag"
-              value={formatNumber(pipeline?.kafka_consumer_lag ?? 0)}
-              unit="msgs"
-              delta={-4.2}
-              sparkColor="#eab308"
-              className="rounded-none border-none"
-            />
-            <MetricCard
-              label="Active sources"
-              value={sources.filter((s) => s.status === "active").length}
-              description={`${sources.filter((s) => s.status === "error").length} in error`}
-              className="rounded-none border-none"
-            />
-          </>
-        )}
-      </div>
-
-      {/* ── Main Dashboard Layout ────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto flex flex-col">
-        
-        {/* Row 1: Main Chart & System Mini-blocks */}
-        <div className="grid grid-cols-1 xl:grid-cols-4 border-b border-[#1e2d3d] min-h-[260px] flex-shrink-0">
-          {/* Main Throughput Chart (Spans 3 cols) */}
-          <div className="xl:col-span-3 flex flex-col border-r border-[#1e2d3d] bg-[#050709]">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[#1e2d3d]">
-              <div className="flex items-center gap-2">
-                <Activity className="w-3.5 h-3.5 text-[#3b82f6]" />
-                <span className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider">
-                  Live Event Throughput
-                </span>
-              </div>
-              <select className="bg-[#0d1117] border border-[#1e2d3d] text-[#e2e8f0] text-[10px] font-mono px-2 py-1 rounded outline-none">
-                <option>Last 1 Hour</option>
-                <option>Last 24 Hours</option>
-                <option>Last 7 Days</option>
-              </select>
-            </div>
-            <div className="flex-1 p-2">
-              {loading ? (
-                <SkeletonBlock rows={8} />
-              ) : (
-                <ThroughputChart data={throughputData} />
-              )}
-            </div>
-          </div>
-
-          {/* Right Column: Normalization Coverage & System Health */}
-          <div className="flex flex-col">
-            <div className="flex flex-col h-1/2 border-b border-[#1e2d3d] bg-[#050709]">
-              <div className="px-4 py-2 border-b border-[#1e2d3d]">
-                <span className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider">
-                  Normalization Coverage
-                </span>
-              </div>
-              <div className="flex-1 p-4">
-                {loading ? (
-                  <Skeleton className="h-full w-full" />
-                ) : (
-                  <NormalizationCoverage coverage={pipeline?.normalization_coverage ?? 0} />
-                )}
-              </div>
-            </div>
-            <div className="flex flex-col h-1/2">
-              <div className="px-4 py-2 border-b border-[#1e2d3d] bg-[#050709]">
-                <span className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider">
-                  System Health
-                </span>
-              </div>
-              <div className="flex-1">
-                {loading ? (
-                  <Skeleton className="h-full w-full rounded-none" />
-                ) : (
-                  <SystemHealthBlock />
-                )}
-              </div>
-            </div>
-          </div>
+      {error ? (
+        <div className="flex-1 overflow-y-auto bg-[#050709]">
+          <BackendErrorState
+            error={error}
+            onRetry={load}
+            title={errorTitle}
+            description={errorDescription}
+            className="h-full"
+          />
         </div>
-
-        {/* Row 2: Pipeline, Anomalies, Sources */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 border-b border-[#1e2d3d] min-h-[320px] flex-shrink-0">
-          {/* Pipeline Health */}
-          <div className="flex flex-col border-r border-[#1e2d3d]">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e2d3d] flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <Layers className="w-3.5 h-3.5 text-[#8b5cf6]" />
-                <span className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider">
-                  Pipeline Stages
-                </span>
-              </div>
-              <Link
-                href="/pipeline"
-                className="flex items-center gap-1 text-[#64748b] hover:text-[#94a3b8] text-[10px] font-mono transition-colors"
-              >
-                Detail <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-            <div className="flex items-center gap-3 px-4 py-1 bg-[#050709] border-b border-[#1e2d3d]/50">
-              <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-28">Stage</span>
-              <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest flex-1">Throughput</span>
-              <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-14 text-right">Rate</span>
-              <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-16 text-right hidden lg:block">Latency</span>
-            </div>
+      ) : (
+        <>
+          {/* ── System Metric Strip ──────────────────────────────────── */}
+          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-px bg-[#1e2d3d] border-b border-[#1e2d3d]">
             {loading ? (
-              <SkeletonBlock rows={8} />
-            ) : (
-              pipeline?.stages.map((stage) => (
-                <PipelineStageBar key={stage.stage} stage={stage} />
+              Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="bg-[#080b0f]">
+                  <SkeletonMetric />
+                </div>
               ))
+            ) : (
+              <>
+                <Tooltip content="Events processed per second across all pipeline stages" className="w-full">
+                  <MetricCard
+                    label="Events / sec"
+                    value={formatNumber(totalEventsPerSec)}
+                    delta={8.4}
+                    sparkData={volumeData}
+                    sparkColor="#3b82f6"
+                    className="rounded-none border-none w-full"
+                  />
+                </Tooltip>
+                <Tooltip content="Total events ingested today" className="w-full">
+                  <MetricCard
+                    label="Events today"
+                    value={formatNumber(pipeline?.total_events_today ?? 0)}
+                    delta={12.1}
+                    className="rounded-none border-none w-full"
+                  />
+                </Tooltip>
+                <Tooltip content="Percentage of events successfully parsed into the universal schema" className="w-full">
+                  <MetricCard
+                    label="Parse success"
+                    value={formatPercent(parseRate)}
+                    delta={0.2}
+                    sparkData={[98.4, 98.5, 98.3, 98.6, 98.7, 98.4, 98.5]}
+                    sparkColor="#22c55e"
+                    valueColor={parseRate > 0.98 ? "#86efac" : parseRate > 0.95 ? "#fde68a" : "#fca5a5"}
+                    className="rounded-none border-none w-full"
+                  />
+                </Tooltip>
+                <Tooltip content="Total critical severity events in the selected time window" className="w-full">
+                  <MetricCard
+                    label="Critical events"
+                    value={formatNumber(criticalData.reduce((a, b) => a + b, 0))}
+                    delta={89.4}
+                    sparkData={criticalData}
+                    sparkColor="#ef4444"
+                    valueColor="#fca5a5"
+                    className="rounded-none border-none w-full"
+                  />
+                </Tooltip>
+                <Tooltip content="Number of events waiting in the Kafka queue to be processed" className="w-full">
+                  <MetricCard
+                    label="Kafka lag"
+                    value={formatNumber(pipeline?.kafka_consumer_lag ?? 0)}
+                    unit="msgs"
+                    delta={-4.2}
+                    sparkColor="#eab308"
+                    className="rounded-none border-none w-full"
+                  />
+                </Tooltip>
+                <Tooltip content="Number of log sources currently streaming data" className="w-full">
+                  <MetricCard
+                    label="Active sources"
+                    value={sources.filter((s) => s.status === "active").length}
+                    description={`${sources.filter((s) => s.status === "error").length} in error`}
+                    className="rounded-none border-none w-full"
+                  />
+                </Tooltip>
+              </>
             )}
           </div>
 
-          {/* Recent Anomalies */}
-          <div className="flex flex-col border-r border-[#1e2d3d]">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e2d3d] flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-3.5 h-3.5 text-[#ef4444]" />
-                <span className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider">
-                  Recent Anomalies
-                </span>
-                {openAlerts.length > 0 && (
-                  <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-[#450a0a] text-[#fca5a5] border border-[#ef4444]/30">
-                    {openAlerts.length}
-                  </span>
-                )}
-              </div>
-              <Link
-                href="/detections"
-                className="flex items-center gap-1 text-[#64748b] hover:text-[#94a3b8] text-[10px] font-mono transition-colors"
-              >
-                All <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-            <div className="flex-1 overflow-y-auto min-h-[250px]">
-              {loading ? (
-                <SkeletonBlock rows={4} />
-              ) : openAlerts.length === 0 ? (
-                <div className="flex items-center justify-center h-full gap-2 text-[#374151] text-xs">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#22c55e]" />
-                  No active alerts
+          {/* ── Main Dashboard Layout ────────────────────────────────────────────── */}
+          <div className="flex-1 overflow-y-auto flex flex-col">
+            
+            {/* Row 1: Main Chart & System Mini-blocks */}
+            <div className="grid grid-cols-1 xl:grid-cols-4 border-b border-[#1e2d3d] min-h-[260px] flex-shrink-0">
+              {/* Main Throughput Chart (Spans 3 cols) */}
+              <div className="xl:col-span-3 flex flex-col border-r border-[#1e2d3d] bg-[#050709]">
+                <div className="flex items-center justify-between px-4 py-2 border-b border-[#1e2d3d]">
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-3.5 h-3.5 text-[#3b82f6]" />
+                    <MetricLabel
+                      label="Live Event Throughput"
+                      tooltip="Ingested, processed, and output event rates over the last hour."
+                      className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider"
+                    />
+                  </div>
+                  <select className="bg-[#0d1117] border border-[#1e2d3d] text-[#e2e8f0] text-[10px] font-mono px-2 py-1 rounded outline-none">
+                    <option>Last 1 Hour</option>
+                    <option>Last 24 Hours</option>
+                    <option>Last 7 Days</option>
+                  </select>
                 </div>
-              ) : (
-                openAlerts.map((alert) => (
-                  <AnomalyRow key={alert.id} alert={alert} />
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Active Sources */}
-          <div className="flex flex-col">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e2d3d] flex-shrink-0">
-              <span className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider">
-                Sources
-              </span>
-              <Link
-                href="/sources"
-                className="flex items-center gap-1 text-[#64748b] hover:text-[#94a3b8] text-[10px] font-mono transition-colors"
-              >
-                All <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-            <div className="flex items-center gap-3 px-4 py-1 bg-[#050709] border-b border-[#1e2d3d]/50 flex-shrink-0">
-              <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest flex-1">Name</span>
-              <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-20 text-right">Events/min</span>
-              <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-12 text-right">Parse%</span>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {loading ? (
-                <SkeletonBlock rows={6} />
-              ) : (
-                sources.map((source) => (
-                  <SourceRow key={source.id} source={source} />
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Row 3: Event Feed & Processing Errors */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 flex-1 min-h-[300px]">
-          {/* Live Event Feed (Spans 2 cols) */}
-          <div className="xl:col-span-2 flex flex-col border-r border-[#1e2d3d]">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e2d3d] flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <Zap className="w-3.5 h-3.5 text-[#3b82f6]" />
-                <span className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider">
-                  Event Feed
-                </span>
-                {liveFeedActive && (
-                  <span className="flex items-center gap-1 text-[#86efac] text-[9px] font-mono">
-                    <StatusDot status="active" size="xs" />
-                    LIVE
-                  </span>
-                )}
-              </div>
-              <Link
-                href="/explorer"
-                className="flex items-center gap-1 text-[#64748b] hover:text-[#94a3b8] text-[10px] font-mono transition-colors"
-              >
-                All events <ArrowRight className="w-3 h-3" />
-              </Link>
-            </div>
-            <div className="flex items-center gap-3 px-4 py-1.5 bg-[#050709] border-b border-[#1e2d3d]/50 flex-shrink-0">
-              <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-[56px]">Severity</span>
-              <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-40">Source</span>
-              <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest flex-1">Action</span>
-              <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-[150px] hidden xl:block">Actor</span>
-              <span className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-24 text-right">Time</span>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {loading ? (
-                <SkeletonBlock rows={12} />
-              ) : events.length === 0 ? (
-                <div className="flex items-center justify-center h-32 text-[#374151] text-xs">
-                  No events
+                <div className="flex-1 p-2">
+                  {loading ? (
+                    <SkeletonBlock rows={8} />
+                  ) : (
+                    <ThroughputChart data={throughputData} />
+                  )}
                 </div>
-              ) : (
-                events.map((event) => (
-                  <EventRow
-                    key={event.id}
-                    event={event}
-                    isNew={newEventIds.has(event.id)}
+              </div>
+
+              {/* Right Column: Normalization Coverage & System Health */}
+              <div className="flex flex-col">
+                <div className="flex flex-col h-1/2 border-b border-[#1e2d3d] bg-[#050709]">
+                  <div className="px-4 py-2 border-b border-[#1e2d3d]">
+                    <MetricLabel
+                      label="Normalization Coverage"
+                      tooltip="Share of events that fully mapped to the universal schema."
+                      className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider"
+                    />
+                  </div>
+                  <div className="flex-1 p-4">
+                    {loading ? (
+                      <Skeleton className="h-full w-full" />
+                    ) : (
+                      <NormalizationCoverage coverage={pipeline?.normalization_coverage ?? 0} />
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col h-1/2">
+                  <div className="px-4 py-2 border-b border-[#1e2d3d] bg-[#050709]">
+                    <MetricLabel
+                      label="System Health"
+                      tooltip="Status of core backend services."
+                      className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    {loading ? (
+                      <Skeleton className="h-full w-full rounded-none" />
+                    ) : (
+                      <SystemHealthBlock />
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Row 2: Pipeline, Anomalies, Sources */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 border-b border-[#1e2d3d] min-h-[320px] flex-shrink-0">
+              {/* Pipeline Health */}
+              <div className="flex flex-col border-r border-[#1e2d3d]">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e2d3d] flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-3.5 h-3.5 text-[#8b5cf6]" />
+                    <MetricLabel
+                      label="Pipeline Stages"
+                      tooltip="Per-stage throughput, latency, and error rate."
+                      className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider"
+                    />
+                  </div>
+                  <Link
+                    href="/pipeline"
+                    className="flex items-center gap-1 text-[#64748b] hover:text-[#94a3b8] text-[10px] font-mono transition-colors"
+                  >
+                    Detail <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-1 bg-[#050709] border-b border-[#1e2d3d]/50">
+                  <MetricLabel
+                    label="Stage"
+                    tooltip="Pipeline processing stage"
+                    className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-32"
                   />
-                ))
-              )}
-            </div>
-          </div>
+                  <MetricLabel
+                    label="Throughput"
+                    tooltip="Events per second at this stage"
+                    className="text-[#374151] text-[9px] font-mono uppercase tracking-widest flex-1"
+                  />
+                  <MetricLabel
+                    label="Rate"
+                    tooltip="Events processed per second"
+                    className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-14 text-right"
+                  />
+                  <MetricLabel
+                    label="Latency"
+                    tooltip="Average processing time at this stage"
+                    className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-16 text-right hidden lg:block"
+                  />
+                </div>
+                {loading ? (
+                  <SkeletonBlock rows={8} />
+                ) : (
+                  pipeline?.stages.map((stage) => (
+                    <PipelineStageBar key={stage.stage} stage={stage} />
+                  ))
+                )}
+              </div>
 
-          {/* Processing Errors */}
-          <div className="flex flex-col">
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e2d3d] bg-[#050709] flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <ServerCrash className="w-3.5 h-3.5 text-[#eab308]" />
-                <span className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider">
-                  Processing Errors
-                </span>
+              {/* Recent Anomalies */}
+              <div className="flex flex-col border-r border-[#1e2d3d]">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e2d3d] flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-[#ef4444]" />
+                    <MetricLabel
+                      label="Recent Anomalies"
+                      tooltip="Anomaly detections that are open or under investigation."
+                      className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider"
+                    />
+                    {openAlerts.length > 0 && (
+                      <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded bg-[#450a0a] text-[#fca5a5] border border-[#ef4444]/30">
+                        {openAlerts.length}
+                      </span>
+                    )}
+                  </div>
+                  <Link
+                    href="/detections"
+                    className="flex items-center gap-1 text-[#64748b] hover:text-[#94a3b8] text-[10px] font-mono transition-colors"
+                  >
+                    All <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+                <div className="flex-1 overflow-y-auto min-h-[250px]">
+                  {loading ? (
+                    <SkeletonBlock rows={4} />
+                  ) : openAlerts.length === 0 ? (
+                    <EmptyState
+                      title="No active alerts"
+                      description="The pipeline is healthy and no anomalies require attention."
+                      icon={<CheckCircle2 className="w-8 h-8 text-[#22c55e]" />}
+                      action={
+                        <Link href="/detections">
+                          <Button variant="outline" size="xs" rightIcon={<ArrowRight className="w-3 h-3" />}>
+                            View detections
+                          </Button>
+                        </Link>
+                      }
+                    />
+                  ) : (
+                    openAlerts.map((alert) => (
+                      <AnomalyRow key={alert.id} alert={alert} />
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Active Sources */}
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e2d3d] flex-shrink-0">
+                  <MetricLabel
+                    label="Sources"
+                    tooltip="Log sources currently sending data to ZeroTrace."
+                    className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider"
+                  />
+                  <Link
+                    href="/sources"
+                    className="flex items-center gap-1 text-[#64748b] hover:text-[#94a3b8] text-[10px] font-mono transition-colors"
+                  >
+                    All <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-1 bg-[#050709] border-b border-[#1e2d3d]/50 flex-shrink-0">
+                  <MetricLabel
+                    label="Name"
+                    tooltip="Log source name"
+                    className="text-[#374151] text-[9px] font-mono uppercase tracking-widest flex-1"
+                  />
+                  <MetricLabel
+                    label="Events/min"
+                    tooltip="Events received per minute"
+                    className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-20 text-right"
+                  />
+                  <MetricLabel
+                    label="Parse success"
+                    tooltip="Percentage of events successfully parsed"
+                    className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-12 text-right"
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {loading ? (
+                    <SkeletonBlock rows={6} />
+                  ) : sources.length === 0 ? (
+                    <EmptyState
+                      title="No sources configured"
+                      description="Add a log source to start ingesting events."
+                      icon={<Inbox className="w-8 h-8" />}
+                      action={
+                        <Link href="/sources">
+                          <Button variant="outline" size="xs" rightIcon={<ArrowRight className="w-3 h-3" />}>
+                            Add source
+                          </Button>
+                        </Link>
+                      }
+                    />
+                  ) : (
+                    sources.map((source) => (
+                      <SourceRow key={source.id} source={source} />
+                    ))
+                  )}
+                </div>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto">
-              {loading ? (
-                <SkeletonBlock rows={5} />
-              ) : (
-                <ErrorStream errors={errors} />
-              )}
+
+            {/* Row 3: Event Feed & Processing Errors */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 flex-1 min-h-[300px]">
+              {/* Live Event Feed (Spans 2 cols) */}
+              <div className="xl:col-span-2 flex flex-col border-r border-[#1e2d3d]">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e2d3d] flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-3.5 h-3.5 text-[#3b82f6]" />
+                    <MetricLabel
+                      label="Event Feed"
+                      tooltip="Most recent normalized events across all sources."
+                      className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider"
+                    />
+                    {liveFeedActive && (
+                      <span className="flex items-center gap-1 text-[#86efac] text-[9px] font-mono">
+                        <StatusDot status="active" size="xs" />
+                        LIVE
+                      </span>
+                    )}
+                  </div>
+                  <Link
+                    href="/explorer"
+                    className="flex items-center gap-1 text-[#64748b] hover:text-[#94a3b8] text-[10px] font-mono transition-colors"
+                  >
+                    All events <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-1.5 bg-[#050709] border-b border-[#1e2d3d]/50 flex-shrink-0">
+                  <MetricLabel
+                    label="Severity"
+                    tooltip="Event severity level"
+                    className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-[56px]"
+                  />
+                  <MetricLabel
+                    label="Source"
+                    tooltip="Log source that produced the event"
+                    className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-40"
+                  />
+                  <MetricLabel
+                    label="Action"
+                    tooltip="Normalized event action"
+                    className="text-[#374151] text-[9px] font-mono uppercase tracking-widest flex-1"
+                  />
+                  <MetricLabel
+                    label="Actor"
+                    tooltip="User or source IP that performed the action"
+                    className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-[150px] hidden xl:block"
+                  />
+                  <MetricLabel
+                    label="Time"
+                    tooltip="Original event timestamp"
+                    className="text-[#374151] text-[9px] font-mono uppercase tracking-widest w-24 text-right"
+                  />
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {loading ? (
+                    <SkeletonBlock rows={12} />
+                  ) : events.length === 0 ? (
+                    <EmptyState
+                      title="No events yet"
+                      description="Events will appear here once your sources start sending logs."
+                      icon={<FileSearch className="w-8 h-8" />}
+                      action={
+                        <Link href="/sources">
+                          <Button variant="outline" size="xs" rightIcon={<ArrowRight className="w-3 h-3" />}>
+                            Configure sources
+                          </Button>
+                        </Link>
+                      }
+                    />
+                  ) : (
+                    events.map((event) => (
+                      <EventRow
+                        key={event.id}
+                        event={event}
+                        isNew={newEventIds.has(event.id)}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Processing Errors */}
+              <div className="flex flex-col">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e2d3d] bg-[#050709] flex-shrink-0">
+                  <div className="flex items-center gap-2">
+                    <ServerCrash className="w-3.5 h-3.5 text-[#eab308]" />
+                    <MetricLabel
+                      label="Processing Errors"
+                      tooltip="Recent parse failures and processing exceptions."
+                      className="text-[#94a3b8] text-xs font-semibold uppercase tracking-wider"
+                    />
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {loading ? (
+                    <SkeletonBlock rows={5} />
+                  ) : errors.length === 0 ? (
+                    <EmptyState
+                      title="No processing errors"
+                      description="All events parsed and normalized successfully."
+                      icon={<CheckCircle2 className="w-8 h-8 text-[#22c55e]" />}
+                    />
+                  ) : (
+                    <ErrorStream errors={errors} />
+                  )}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }
