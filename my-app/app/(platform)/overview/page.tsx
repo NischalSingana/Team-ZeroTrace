@@ -7,7 +7,6 @@ import { SeverityBadge } from "@/components/ui/badge";
 import { StatusDot } from "@/components/ui/status-dot";
 import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
 import { Timestamp } from "@/components/ui/timestamp";
-import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { getRecentEvents } from "@/lib/services/events";
 import { getPipelineMetrics } from "@/lib/services/pipeline";
@@ -246,10 +245,11 @@ export default function OverviewPage() {
     setLoading(false);
   }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Initial data load
   useEffect(() => {
-    load();
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch; state updates happen after await
+    void load();
+  }, [load]);
 
   // Clear new event highlights
   useEffect(() => {
