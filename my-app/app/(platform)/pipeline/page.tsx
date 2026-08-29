@@ -91,7 +91,7 @@ export default function PipelinePage() {
         />
         
         {/* Center: Visual Pipeline */}
-        <div className="flex-1 overflow-hidden min-w-[500px]">
+        <div className="flex-1 overflow-hidden relative min-w-0">
           <PipelineCanvas 
              metrics={pipeline} 
              selectedEvent={selectedEvent} 

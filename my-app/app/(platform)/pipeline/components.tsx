@@ -37,8 +37,8 @@ export function PipelineCanvas({
 }) {
   return (
     <div className="flex flex-col h-full bg-[#050709]">
-      <div className="flex-1 flex flex-col items-center justify-center p-8 overflow-x-auto relative">
-        <div className="flex items-center justify-center min-w-max gap-0 mt-8">
+      <div className="flex-1 flex flex-col justify-center p-8 overflow-x-auto relative">
+        <div className="flex items-center min-w-max gap-0 mt-8 mx-auto">
           {STAGE_CONFIG.map((stage, i) => {
             const Icon = stage.icon;
             const stageMetric = metrics?.stages.find((s) => s.stage === stage.id || s.stage.includes(stage.id));
