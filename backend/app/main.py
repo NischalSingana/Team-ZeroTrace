@@ -1,5 +1,6 @@
 """ULPF FastAPI Application"""
 import time
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -13,37 +14,43 @@ from app.routers import events, sources, parsers, pipeline, health, analytics, a
 from app.services.auth_service import get_current_active_user
 
 
+async def _auto_seed():
+    """Run demo seed in background after startup."""
+    await asyncio.sleep(3)  # Wait for DB to fully settle
+    try:
+        from app.routers.demo import _seed_sources, _seed_parsers, _seed_events
+        from app.services.auth_service import get_password_hash
+        from app.models import User
+        from sqlalchemy.future import select
+        async for db in get_db():
+            result = await db.execute(select(User).where(User.username == "admin"))
+            if not result.scalar_one_or_none():
+                db.add(User(
+                    username="admin",
+                    email="admin@ulpf.local",
+                    hashed_password=get_password_hash("admin"),
+                    is_active=True,
+                    is_superuser=True
+                ))
+                await db.commit()
+            await _seed_sources(db)
+            await _seed_parsers(db)
+            await _seed_events(db, 100)
+            break
+        print("[ULPF] Auto-seed completed successfully.")
+    except Exception as e:
+        print(f"[ULPF] Auto-seed warning: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: create tables
+    # Startup: create tables first
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     
-    # Auto-seed demo data on first boot
+    # Fire-and-forget background seed (non-blocking)
     if settings.DEMO_MODE:
-        try:
-            from app.routers.demo import _seed_sources, _seed_parsers, _seed_events
-            from app.services.auth_service import get_password_hash
-            from app.models import User
-            from sqlalchemy.future import select
-            async for db in get_db():
-                # Seed admin user
-                result = await db.execute(select(User).where(User.username == "admin"))
-                if not result.scalar_one_or_none():
-                    db.add(User(
-                        username="admin",
-                        email="admin@ulpf.local",
-                        hashed_password=get_password_hash("admin"),
-                        is_active=True,
-                        is_superuser=True
-                    ))
-                    await db.commit()
-                await _seed_sources(db)
-                await _seed_parsers(db)
-                await _seed_events(db, 100)
-                break
-        except Exception as e:
-            print(f"[ULPF] Auto-seed warning: {e}")
+        asyncio.create_task(_auto_seed())
     
     yield
     # Shutdown
