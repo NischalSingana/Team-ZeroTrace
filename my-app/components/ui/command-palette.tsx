@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Command as CommandPrimitive } from "cmdk";
-import { Search, X } from "lucide-react";
+import { Search } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { Modal, ModalContent } from "./modal";
 
@@ -21,7 +21,7 @@ const Command = React.forwardRef<
 ));
 Command.displayName = CommandPrimitive.displayName;
 
-interface CommandDialogProps extends React.ComponentPropsWithoutRef<typeof Modal> {}
+type CommandDialogProps = React.ComponentPropsWithoutRef<typeof Modal>;
 
 const CommandDialog = ({ children, ...props }: CommandDialogProps) => {
   return (
