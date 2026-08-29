@@ -1,4 +1,11 @@
 import { fetchJson } from "./api";
+import type { Parser } from "../types";
+
+export interface ParserValidationResult {
+  passed: boolean;
+  warnings: string[];
+  tested_samples: number;
+}
 
 export interface AIMappingSuggestion {
   source_field: string;
@@ -31,7 +38,7 @@ export async function generateParser(
   suggestions: AIMappingSuggestion[],
   parserName: string,
   sourceType?: string
-): Promise<{ parser: any; parser_id: string; validation_result: any }> {
+): Promise<{ parser: Partial<Parser>; parser_id: string; validation_result: ParserValidationResult }> {
   return fetchJson("/api/ai/generate-parser", {
     method: "POST",
     body: JSON.stringify({
