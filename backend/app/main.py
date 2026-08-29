@@ -5,10 +5,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi import Depends
 
 from app.config import settings
 from app.database import engine, Base
-from app.routers import events, sources, parsers, pipeline, health, analytics, ai, demo, raw_events
+from app.routers import events, sources, parsers, pipeline, health, analytics, ai, demo, raw_events, auth
+from app.services.auth_service import get_current_active_user
 
 
 @asynccontextmanager
@@ -54,12 +56,13 @@ async def health_check():
 
 
 # Include routers
-app.include_router(events.router, prefix="/api/events", tags=["Events"])
-app.include_router(sources.router, prefix="/api/sources", tags=["Sources"])
-app.include_router(parsers.router, prefix="/api/parsers", tags=["Parsers"])
-app.include_router(pipeline.router, prefix="/api/pipeline", tags=["Pipeline"])
-app.include_router(health.router, prefix="/api/health", tags=["Health"])
-app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
-app.include_router(ai.router, prefix="/api/ai", tags=["AI"])
-app.include_router(demo.router, prefix="/api/demo", tags=["Demo"])
-app.include_router(raw_events.router, prefix="/api/raw-events", tags=["Raw Events"])
+app.include_router(events.router, prefix="/api/events", tags=["Events"], dependencies=[Depends(get_current_active_user)])
+app.include_router(sources.router, prefix="/api/sources", tags=["Sources"], dependencies=[Depends(get_current_active_user)])
+app.include_router(parsers.router, prefix="/api/parsers", tags=["Parsers"], dependencies=[Depends(get_current_active_user)])
+app.include_router(pipeline.router, prefix="/api/pipeline", tags=["Pipeline"], dependencies=[Depends(get_current_active_user)])
+app.include_router(health.router, prefix="/api/health", tags=["Health"]) # Unprotected for probes
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"], dependencies=[Depends(get_current_active_user)])
+app.include_router(ai.router, prefix="/api/ai", tags=["AI"], dependencies=[Depends(get_current_active_user)])
+app.include_router(demo.router, prefix="/api/demo", tags=["Demo"], dependencies=[Depends(get_current_active_user)])
+app.include_router(raw_events.router, prefix="/api/raw-events", tags=["Raw Events"], dependencies=[Depends(get_current_active_user)])
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"]) # Unprotected for login/register

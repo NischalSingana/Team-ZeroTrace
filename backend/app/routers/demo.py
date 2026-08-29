@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import select
 
 from app.database import get_db
-from app.models import Source, Parser, Event, AnomalyAlert
+from app.models import Source, Parser, Event, AnomalyAlert, User
 from app.services.parser_engine import parse_log
+from app.services.auth_service import get_password_hash
 
 router = APIRouter()
 
@@ -180,6 +181,18 @@ async def _seed_events(db, count: int = 100):
 @router.post("/seed")
 async def seed_demo_data(count: int = 100, db=Depends(get_db)):
     """Seed the database with demo data for SIH presentation."""
+    # Seed default admin user
+    result = await db.execute(select(User).where(User.username == "admin"))
+    if not result.scalar_one_or_none():
+        db.add(User(
+            username="admin",
+            email="admin@ulpf.local",
+            hashed_password=get_password_hash("admin"),
+            is_active=True,
+            is_superuser=True
+        ))
+        await db.commit()
+
     await _seed_sources(db)
     await _seed_parsers(db)
     await _seed_events(db, count)
