@@ -1,10 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
 import { formatNumber, formatDuration } from "@/lib/utils/format";
 import { Timestamp } from "@/components/ui/timestamp";
 import { SeverityBadge } from "@/components/ui/badge";
-import { StatusDot } from "@/components/ui/status-dot";
 import { Button } from "@/components/ui/button";
 import type { NormalizedEvent, PipelineMetrics } from "@/lib/types";
 import {
@@ -13,12 +11,8 @@ import {
   FileCode2,
   Database,
   CheckCircle2,
-  GitCommit,
-  ArrowRight,
   Zap,
-  Play,
   RotateCcw,
-  Activity,
   Box,
   Network
 } from "lucide-react";
