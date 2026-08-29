@@ -163,6 +163,15 @@ The core ULPF pipeline works without internet access:
 
 ---
 
+Key Benefits
+
+* Reduces manual parser development and maintenance.
+* Accelerates onboarding of new vendors and log formats.
+* Provides a single normalized view of heterogeneous security events.
+* Reduces dependency on vendor-specific integrations.
+* Supports both batch log processing and real-time streaming.
+* Enables faster security investigation through standardized fields.
+
 ## License
 
 MIT
