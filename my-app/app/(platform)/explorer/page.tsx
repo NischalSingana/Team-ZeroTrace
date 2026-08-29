@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { PageHeader } from "@/components/layout/page-header";
+import { useSearchParams } from "next/navigation";
 import { SeverityBadge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Timestamp } from "@/components/ui/timestamp";
@@ -11,7 +10,6 @@ import { searchEvents } from "@/lib/services/events";
 import { fetchSources } from "@/lib/services/sources";
 import {
   formatNumber,
-  formatConfidence,
 } from "@/lib/utils/format";
 import type {
   NormalizedEvent,
@@ -30,18 +28,12 @@ import {
   ChevronRight,
   Download,
   X,
-  Brain,
   Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { EventInspectorPane } from "./inspector";
 
 const SEVERITIES: Severity[] = ["critical", "high", "medium", "low", "info", "unknown"];
-const CATEGORIES: EventCategory[] = [
-  "authentication", "authorization", "network_connection", "network_denial",
-  "dns", "http", "process_execution", "file_access", "threat_detection",
-  "anomaly", "audit", "system", "application", "other",
-];
 const OUTCOMES = ["success", "failure", "blocked"];
 const FORMATS = ["json_lines", "syslog_rfc3164", "syslog_rfc5424", "cef", "leef", "combined", "windows_evtx", "w3c_extended"];
 
@@ -184,7 +176,6 @@ const PAGE_SIZE = 50;
 
 function ExplorerInner() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
 
   const [searchText, setSearchText] = useState(searchParams.get("q") ?? "");
@@ -229,7 +220,10 @@ function ExplorerInner() {
     setLoading(false);
   }, [searchText, selectedSeverities, selectedCategories, selectedSourceIds, page, sortBy, sortDir]);
 
-  useEffect(() => { doSearch(); }, [doSearch]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async search; state updates happen after await
+    void doSearch();
+  }, [doSearch]);
   useEffect(() => { fetchSources().then(setSources); }, []);
 
   // Keyboard shortcut: / to focus search
@@ -254,7 +248,7 @@ function ExplorerInner() {
     setPage(0);
   };
 
-  const toggleFilter = (setFn: React.Dispatch<React.SetStateAction<any[]>>, val: any) => {
+  const toggleFilter = <T,>(setFn: React.Dispatch<React.SetStateAction<T[]>>, val: T) => {
     setFn(prev => prev.includes(val) ? prev.filter(x => x !== val) : [...prev, val]);
     setPage(0);
   };
@@ -492,7 +486,7 @@ function ExplorerInner() {
                     <tr key={i} className="border-b border-[#1e2d3d]/30">
                       {Array.from({ length: 8 }).map((__, j) => (
                         <td key={j} className="py-2.5 px-3">
-                          <div className="h-2 rounded bg-[#1e2d3d]/50 animate-pulse" style={{ width: `${30 + Math.random() * 50}%` }} />
+                          <div className="h-2 rounded bg-[#1e2d3d]/50 animate-pulse" style={{ width: `${[65, 42, 78, 35, 58, 48, 70, 52][(i + j) % 8]}%` }} />
                         </td>
                       ))}
                     </tr>
