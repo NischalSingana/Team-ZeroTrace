@@ -28,8 +28,8 @@ export default function DemoConsolePage() {
     try {
       const result = await fetchJson<{ seeded: { events: number; sources: number; parsers: number } }>("/api/demo/seed", { method: "POST" });
       setSeedResult(`Seeded ${result.seeded.events} events, ${result.seeded.sources} sources, ${result.seeded.parsers} parsers.`);
-    } catch (err: any) {
-      setSeedResult(`Error: ${err.message}`);
+    } catch (err) {
+      setSeedResult(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       setSeeding(false);
     }
