@@ -35,6 +35,8 @@ export default function LoginPage() {
       const data = await res.json();
       setToken(data.access_token);
       setUser({ username });
+      // Set cookie for Next.js middleware
+      document.cookie = `ulpf-auth-token=${data.access_token}; path=/; max-age=604800; samesite=strict`;
       router.push('/overview');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');

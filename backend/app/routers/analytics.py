@@ -82,46 +82,56 @@ async def throughput(
     return ApiResponse(data=[d.model_dump() for d in data])
 
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
+from fastapi import Depends
+from app.database import get_db
+from app.models import Event
+
 @router.get("/severity-breakdown")
-async def severity_breakdown():
+async def severity_breakdown(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Event.severity, func.count(Event.id))
+        .group_by(Event.severity)
+    )
+    counts = dict(result.all())
+    
     return ApiResponse(data=SeverityBreakdown(
-        critical=random.randint(200, 300),
-        high=random.randint(1500, 2000),
-        medium=random.randint(7000, 9000),
-        low=random.randint(18000, 21000),
-        info=random.randint(12000000, 13000000),
-        unknown=random.randint(80, 120),
+        critical=counts.get("critical", 0),
+        high=counts.get("high", 0),
+        medium=counts.get("medium", 0),
+        low=counts.get("low", 0),
+        info=counts.get("info", 0),
+        unknown=counts.get("unknown", 0),
     ).model_dump())
 
 
 @router.get("/top-sources")
-async def top_sources():
-    return ApiResponse(data=[
-        SourceTopEntry(
-            source_id="src_010",
-            source_name="Custom App — Payments Service",
-            source_type="application",
-            event_count=random.randint(4000, 5000),
-            percentage=31.2,
-            trend="up",
-        ).model_dump(),
-        SourceTopEntry(
-            source_id="src_002",
-            source_name="Nginx Web Gateway — PROD",
-            source_type="web_server",
-            event_count=random.randint(2800, 3200),
-            percentage=20.2,
+async def top_sources(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(Event.source_id, Event.source_name, Event.source_type, func.count(Event.id).label("c"))
+        .group_by(Event.source_id, Event.source_name, Event.source_type)
+        .order_by(func.count(Event.id).desc())
+        .limit(5)
+    )
+    rows = result.all()
+    
+    total_result = await db.execute(select(func.count(Event.id)))
+    total = total_result.scalar() or 1
+    
+    out = []
+    for row in rows:
+        pct = round((row.c / total) * 100, 1)
+        out.append(SourceTopEntry(
+            source_id=row.source_id,
+            source_name=row.source_name,
+            source_type=row.source_type,
+            event_count=row.c,
+            percentage=pct,
             trend="stable",
-        ).model_dump(),
-        SourceTopEntry(
-            source_id="src_012",
-            source_name="Splunk UF — Server Farm",
-            source_type="custom",
-            event_count=random.randint(1000, 1400),
-            percentage=8.0,
-            trend="up",
-        ).model_dump(),
-    ])
+        ).model_dump())
+        
+    return ApiResponse(data=out)
 
 
 @router.get("/processing-errors")
