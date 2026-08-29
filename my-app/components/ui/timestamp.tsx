@@ -34,6 +34,7 @@ export function Timestamp({
         className
       )}
       aria-label={`Timestamp: ${display}. Click to toggle format.`}
+      suppressHydrationWarning
     >
       {display}
     </button>
