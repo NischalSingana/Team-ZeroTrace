@@ -42,15 +42,17 @@ async def _auto_seed():
         print(f"[ULPF] Auto-seed warning: {e}")
 
 
+from app.services.stream_service import background_writer, background_ingester
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: create tables first
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     
-    # Fire-and-forget background seed (non-blocking)
-    if settings.DEMO_MODE:
-        asyncio.create_task(_auto_seed())
+    # Fire-and-forget background stream tasks (non-blocking)
+    asyncio.create_task(background_writer())
+    asyncio.create_task(background_ingester())
     
     yield
     # Shutdown

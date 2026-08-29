@@ -8,3 +8,15 @@ export async function getPipelineMetrics(): Promise<PipelineMetrics> {
   await MOCK_DELAY();
   return fetchJson<PipelineMetrics>("/api/pipeline/metrics");
 }
+
+export async function pauseStream(): Promise<void> {
+  await fetchJson("/api/pipeline/stream/pause", { method: "POST" });
+}
+
+export async function resumeStream(): Promise<void> {
+  await fetchJson("/api/pipeline/stream/resume", { method: "POST" });
+}
+
+export async function restartStream(): Promise<void> {
+  await fetchJson("/api/pipeline/stream/restart", { method: "POST" });
+}

@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { getPipelineMetrics } from "@/lib/services/pipeline";
+import { getPipelineMetrics, pauseStream, resumeStream, restartStream } from "@/lib/services/pipeline";
 import { getRecentEvents } from "@/lib/services/events";
 import { useUIStore } from "@/lib/store/ui";
 import { useInterval } from "@/lib/utils/hooks";
@@ -32,7 +32,6 @@ export default function PipelinePage() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch; state updates happen after await
     void load();
   }, [load]);
   useInterval(load, liveFeedActive ? 2000 : null);
@@ -42,8 +41,27 @@ export default function PipelinePage() {
   const handleSelectEvent = (evt: NormalizedEvent) => {
     setSelectedEventId(evt.id);
     if (liveFeedActive) {
-      toggleLiveFeed(); // Pause the stream when selecting an event to inspect
+      toggleLiveFeed(); // Update local state
+      void pauseStream(); // Also pause backend
     }
+  };
+
+  const handleToggleFeed = async () => {
+    if (liveFeedActive) {
+      await pauseStream();
+    } else {
+      await resumeStream();
+    }
+    toggleLiveFeed();
+  };
+
+  const handleRestart = async () => {
+    await restartStream();
+    setEvents([]);
+    if (!liveFeedActive) {
+       toggleLiveFeed();
+    }
+    void load();
   };
 
   return (
@@ -61,17 +79,17 @@ export default function PipelinePage() {
               1x Rate
             </Button>
             <Button
-              variant="ghost"
+              variant="outline"
               size="xs"
-              onClick={load}
+              onClick={handleRestart}
               leftIcon={<RefreshCw className="w-3 h-3" />}
             >
-              Refresh
+              Restart
             </Button>
             <Button
               variant={liveFeedActive ? "subtle" : "ghost"}
               size="xs"
-              onClick={toggleLiveFeed}
+              onClick={handleToggleFeed}
               leftIcon={liveFeedActive ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
               className={liveFeedActive ? "text-[#86efac] border-[#22c55e]/20 bg-[#052e16]" : ""}
             >

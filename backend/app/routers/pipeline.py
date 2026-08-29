@@ -4,6 +4,7 @@ import random
 from fastapi import APIRouter
 
 from app.schemas import PipelineMetrics, PipelineStageMetrics, ApiResponse
+from app.services.stream_service import pause_stream, resume_stream, restart_stream, stream_state
 
 router = APIRouter()
 
@@ -115,4 +116,22 @@ def _generate_pipeline_metrics() -> PipelineMetrics:
 
 @router.get("/metrics", response_model=ApiResponse)
 async def get_metrics():
-    return ApiResponse(data=_generate_pipeline_metrics().model_dump())
+    metrics = _generate_pipeline_metrics()
+    # Optional: adjust metrics slightly if paused
+    if not stream_state.is_streaming:
+        metrics.total_events_per_sec = 0
+        for stage in metrics.stages:
+            stage.events_per_sec = 0
+    return ApiResponse(data=metrics.model_dump())
+
+@router.post("/stream/pause")
+async def api_pause_stream():
+    return await pause_stream()
+
+@router.post("/stream/resume")
+async def api_resume_stream():
+    return await resume_stream()
+
+@router.post("/stream/restart")
+async def api_restart_stream():
+    return await restart_stream()
