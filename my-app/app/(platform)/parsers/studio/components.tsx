@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
-import { 
-  Brackets, GitCommit, FileJson, ArrowRight, GitBranch,
-  Play, Plus, Save, Settings, PlayCircle, Eye, ShieldCheck, BoxSelect
+import {
+  GitCommit, FileJson, ArrowRight, GitBranch,
+  Plus, Save, Settings
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
