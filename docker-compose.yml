@@ -102,12 +102,6 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    healthcheck:
-      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server localhost:9092"]
-      interval: 15s
-      timeout: 10s
-      retries: 15
-      start_period: 30s
     restart: unless-stopped
 
   # ── ULPF Backend ───────────────────────────────────────────────
@@ -160,7 +154,7 @@ services:
       postgres:
         condition: service_healthy
       kafka:
-        condition: service_healthy
+        condition: service_started
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://ulpf:ulpf@postgres:5432/ulpf}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
