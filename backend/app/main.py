@@ -8,16 +8,43 @@ from fastapi.responses import JSONResponse
 from fastapi import Depends
 
 from app.config import settings
-from app.database import engine, Base
+from app.database import engine, Base, get_db
 from app.routers import events, sources, parsers, pipeline, health, analytics, ai, demo, raw_events, auth
 from app.services.auth_service import get_current_active_user
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    # Startup: create tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    
+    # Auto-seed demo data on first boot
+    if settings.DEMO_MODE:
+        try:
+            from app.routers.demo import _seed_sources, _seed_parsers, _seed_events
+            from app.services.auth_service import get_password_hash
+            from app.models import User
+            from sqlalchemy.future import select
+            async for db in get_db():
+                # Seed admin user
+                result = await db.execute(select(User).where(User.username == "admin"))
+                if not result.scalar_one_or_none():
+                    db.add(User(
+                        username="admin",
+                        email="admin@ulpf.local",
+                        hashed_password=get_password_hash("admin"),
+                        is_active=True,
+                        is_superuser=True
+                    ))
+                    await db.commit()
+                await _seed_sources(db)
+                await _seed_parsers(db)
+                await _seed_events(db, 100)
+                break
+        except Exception as e:
+            print(f"[ULPF] Auto-seed warning: {e}")
+    
     yield
     # Shutdown
     await engine.dispose()
