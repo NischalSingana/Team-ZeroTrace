@@ -36,8 +36,8 @@ export default function LoginPage() {
       setToken(data.access_token);
       setUser({ username });
       router.push('/overview');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
       setLoading(false);
     }
