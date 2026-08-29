@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Play, LayoutTemplate, Bug } from "lucide-react";
-import { ConfigPane, MappingPane, Rule, Mapping, ParserStatus } from "./components";
+import { ConfigPane, MappingPane, Rule, Mapping } from "./components";
 
 const MOCK_RULES: Rule[] = [
   { id: "r1", type: "regex", name: "CEF Header", pattern: "^CEF:0\\\\|(?<vendor>.*?)\\\\|(?<product>.*?)\\\\|(?<version>.*?)\\\\|(?<event_id>.*?)\\\\|(?<event_name>.*?)\\\\|(?<severity>.*?)\\\\|(?<extensions>.*)$" },
