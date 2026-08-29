@@ -1,16 +1,16 @@
 "use client";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { 
-  Server, Cpu, HardDrive, Network, AlertCircle, Activity, 
-  ArrowRight, CheckCircle2, AlertTriangle, Zap, RotateCw
+import {
+  HardDrive, AlertCircle, Activity,
+  ArrowRight, CheckCircle2, AlertTriangle, RotateCw
 } from "lucide-react";
-import { 
+import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  BarChart, Bar, LineChart, Line
+  BarChart, Bar
 } from 'recharts';
-import { 
-  COMPONENTS, PIPELINE_CHART_DATA, LATENCY_CHART_DATA, QUEUE_DATA, ServiceStatus
+import {
+  COMPONENTS, PIPELINE_CHART_DATA, QUEUE_DATA, ServiceStatus
 } from "./data";
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ const getStatusConfig = (status: ServiceStatus) => {
   }
 };
 
-const FlowNode = ({ title, status, metric, subMetric, isMain = false }: any) => {
+const FlowNode = ({ title, status, metric, subMetric }: { title: string; status: ServiceStatus; metric: string; subMetric: string }) => {
   const config = getStatusConfig(status);
   const Icon = config.icon;
   
