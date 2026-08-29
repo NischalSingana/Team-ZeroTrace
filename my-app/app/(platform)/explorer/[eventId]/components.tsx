@@ -2,16 +2,16 @@
 
 import { useState } from "react";
 import type { NormalizedEvent, LineageStep } from "@/lib/types";
-import { formatDuration, formatConfidence } from "@/lib/utils/format";
 import { cn } from "@/lib/utils/cn";
-import { 
-  CheckCircle2, AlertTriangle, XCircle, SkipForward, Activity,
+import {
+  CheckCircle2, AlertTriangle, XCircle,
   ArrowRight, SearchCode, Database, BrainCircuit, Box, ShieldCheck, Cpu
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 // ── 1. Horizontal Timeline ───────────────────────────────────────
 
-const STAGE_CONFIG: Record<string, { label: string; color: string; icon: any }> = {
+const STAGE_CONFIG: Record<string, { label: string; color: string; icon: LucideIcon }> = {
   ingest: { label: "Ingest", color: "#8b5cf6", icon: Box },
   format_detection: { label: "Detection", color: "#06b6d4", icon: SearchCode },
   parser_match: { label: "Parser", color: "#3b82f6", icon: Cpu },
@@ -201,7 +201,7 @@ export function MappingCanvas({ event }: { event: NormalizedEvent }) {
 
           <div className="flex-1 overflow-auto p-4 space-y-1">
              {normalizedKeys.map((key) => {
-               const val = (event as any)[key];
+               const val = (event as unknown as Record<string, unknown>)[key];
                if (typeof val === 'object' && val !== null) {
                   // Render sub-keys for actors/targets
                   return (
@@ -222,7 +222,7 @@ export function MappingCanvas({ event }: { event: NormalizedEvent }) {
                             )}
                           >
                             <span className={isSelected ? "text-[#3b82f6] font-bold" : ""}>{subKey}</span>
-                            <span className="truncate max-w-[150px] text-right opacity-80">{String(val[subKey])}</span>
+                            <span className="truncate max-w-[150px] text-right opacity-80">{String((val as Record<string, unknown>)[subKey])}</span>
                           </div>
                         )
                       })}
