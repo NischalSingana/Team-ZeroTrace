@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Bell, Search, Wifi, WifiOff } from "lucide-react";
+import { Bell, Search, Wifi, WifiOff, LogOut } from "lucide-react";
 import { useUIStore } from "@/lib/store/ui";
 import { Button } from "@/components/ui/button";
 import { StatusDot } from "@/components/ui/status-dot";
 import { cn } from "@/lib/utils/cn";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuthStore } from "@/lib/auth-store";
 
 interface TopbarProps {
   alertCount?: number;
@@ -17,7 +18,26 @@ export function Topbar({ alertCount = 5 }: TopbarProps) {
   const { liveFeedActive, toggleLiveFeed } = useUIStore();
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const router = useRouter();
+  const { user, logout } = useAuthStore();
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleLogout = () => {
+    logout();
+    router.replace("/login");
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,14 +148,44 @@ export function Topbar({ alertCount = 5 }: TopbarProps) {
 
       <div className="w-px h-4 bg-[#1e2d3d]" />
 
-      {/* User profile */}
-      <button
-        type="button"
-        className="flex items-center justify-center w-7 h-7 rounded-full bg-[#1e2d3d] text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#243044] transition-colors text-[10px] font-bold tracking-wider border border-[#243044]"
-        aria-label="User profile"
-      >
-        AD
-      </button>
+      {/* User profile + logout dropdown */}
+      <div className="relative" ref={menuRef}>
+        <button
+          type="button"
+          onClick={() => setUserMenuOpen((v) => !v)}
+          className="flex items-center justify-center w-7 h-7 rounded-full bg-[#1e2d3d] text-[#94a3b8] hover:text-[#e2e8f0] hover:bg-[#243044] transition-colors text-[10px] font-bold tracking-wider border border-[#243044]"
+          aria-label="User menu"
+          aria-expanded={userMenuOpen}
+          id="user-menu-button"
+        >
+          {user?.username ? user.username.slice(0, 2).toUpperCase() : "AD"}
+        </button>
+
+        {userMenuOpen && (
+          <div
+            className="absolute right-0 top-9 z-50 min-w-[160px] rounded-lg border border-[#1e2d3d] bg-[#0d1117] shadow-2xl py-1"
+            role="menu"
+            aria-labelledby="user-menu-button"
+          >
+            {user?.username && (
+              <div className="px-3 py-2 border-b border-[#1e2d3d]">
+                <p className="text-[10px] font-mono text-[#475569] uppercase tracking-widest">Signed in as</p>
+                <p className="text-xs font-mono font-semibold text-[#94a3b8] mt-0.5 truncate">{user.username}</p>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-mono text-[#f87171] hover:bg-[#450a0a] transition-colors"
+              role="menuitem"
+              id="logout-button"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Sign Out
+            </button>
+          </div>
+        )}
+      </div>
     </header>
   );
 }

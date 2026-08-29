@@ -8,14 +8,21 @@ import { useAuthStore } from "@/lib/auth-store";
 export default function PlatformLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const token = useAuthStore((state) => state.token);
+  const hasHydrated = useAuthStore((state) => state._hasHydrated);
+
+  // Manually trigger rehydration from localStorage on first client mount
+  useEffect(() => {
+    useAuthStore.persist.rehydrate();
+  }, []);
 
   useEffect(() => {
-    if (!token) {
+    if (hasHydrated && !token) {
       router.replace("/login");
     }
-  }, [token, router]);
+  }, [token, hasHydrated, router]);
 
-  if (!token) {
+  // Show spinner until we've read from localStorage
+  if (!hasHydrated || !token) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-[#050709]">
         <div className="flex flex-col items-center gap-4">

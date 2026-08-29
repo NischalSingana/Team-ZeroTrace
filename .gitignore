@@ -8,3 +8,7 @@ node_modules/
 .next/
 .venv/
 venv/
+
+# IDE & tooling
+.vscode/
+pyrightconfig.json
