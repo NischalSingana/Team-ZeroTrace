@@ -1,11 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
-import { Server, Database, Brain, HardDrive, Filter, Activity, ServerCrash } from "lucide-react";
+import { Database, Brain, HardDrive, Filter, Activity } from "lucide-react";
 import { formatNumber } from "@/lib/utils/format";
 import { Timestamp } from "@/components/ui/timestamp";
-import type { ThroughputPoint, ProcessingError, PipelineMetrics } from "@/lib/types";
+import type { ThroughputPoint, ProcessingError } from "@/lib/types";
 
 // ── Throughput Chart ──────────────────────────────────────────────
 
@@ -13,21 +12,27 @@ interface ThroughputChartProps {
   data: ThroughputPoint[];
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+interface ChartTooltipProps {
+  active?: boolean;
+  label?: string | number;
+  payload?: ReadonlyArray<{ name?: string | number; value?: number | string; color?: string }>;
+}
+
+const CustomTooltip = ({ active, payload, label }: ChartTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-[#0a0d12] border border-[#1e2d3d] p-3 rounded-lg shadow-xl relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-[#3b82f6] to-[#10b981]" />
         <p className="text-[#94a3b8] text-xs font-mono mb-2 uppercase tracking-widest">{label}</p>
         <div className="flex flex-col gap-1.5">
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry, index) => (
             <div key={index} className="flex items-center gap-3">
               <div 
                 className="w-2 h-2 rounded-full" 
                 style={{ backgroundColor: entry.color }}
               />
               <span className="text-[#e2e8f0] text-sm font-semibold w-16">
-                {formatNumber(entry.value)}
+                {formatNumber(Number(entry.value ?? 0))}
               </span>
               <span className="text-[#64748b] text-[10px] font-mono uppercase tracking-widest">
                 {entry.name}
