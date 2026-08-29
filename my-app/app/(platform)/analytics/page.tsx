@@ -1,19 +1,19 @@
 "use client";
 
 import { PageHeader } from "@/components/layout/page-header";
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
-  BarChart, Bar, Cell
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer
 } from 'recharts';
-import { 
+import {
   Activity, ShieldAlert, Zap, Clock, ChevronDown, Filter, LayoutGrid
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { 
   VOLUME_DATA, TOP_IPS, TOP_USERS, PARSER_PERF, CATEGORY_DISTRIBUTION 
 } from "./data";
 import { cn } from "@/lib/utils/cn";
 
-const StatBlock = ({ title, value, sub, icon: Icon, trend }: { title: string, value: string, sub?: string, icon: any, trend: number }) => (
+const StatBlock = ({ title, value, icon: Icon, trend }: { title: string; value: string; icon: LucideIcon; trend: number }) => (
   <div className="bg-[#0a0d12] border border-[#1e2d3d] rounded-lg p-5 flex flex-col justify-between relative overflow-hidden group hover:border-[#3b82f6]/50 transition-colors">
     <div className="flex justify-between items-start mb-4">
       <span className="text-[#94a3b8] text-xs font-mono uppercase tracking-widest">{title}</span>
