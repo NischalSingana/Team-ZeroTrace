@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { 
@@ -43,8 +42,8 @@ export default function AIMappingPage() {
         result.suggestions.map((s) => ({ ...s, status: "pending" as SuggestionStatus }))
       );
       setAnalysisComplete(true);
-    } catch (err: any) {
-      setAnalysisError(err.message || "Analysis failed");
+    } catch (err) {
+      setAnalysisError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
       setIsAnalyzing(false);
     }
@@ -69,8 +68,8 @@ export default function AIMappingPage() {
       setGeneratedParserId(result.parser_id);
       setIsGenerating(false);
       setIsGenerated(true);
-    } catch (err: any) {
-      setAnalysisError(err.message || "Parser generation failed");
+    } catch (err) {
+      setAnalysisError(err instanceof Error ? err.message : "Parser generation failed");
       setIsGenerating(false);
     }
   };
