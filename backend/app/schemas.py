@@ -1,5 +1,5 @@
 """ULPF Pydantic Schemas"""
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Literal, Any
 from pydantic import BaseModel, Field
 
@@ -10,7 +10,7 @@ class ApiResponse(BaseModel):
     data: Any
     success: bool = True
     error: Optional[str] = None
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class PaginatedResponse(BaseModel):
@@ -20,7 +20,7 @@ class PaginatedResponse(BaseModel):
     page_size: int
     has_more: bool
     query_ms: int
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 # ── Source Schemas ─────────────────────────────────────────────
@@ -197,7 +197,7 @@ class EventCreate(EventBase):
 
 
 class EventOut(EventCreate):
-    id: str
+    id: str  # type: ignore
 
     class Config:
         from_attributes = True
@@ -298,8 +298,8 @@ class AnomalyAlertOut(BaseModel):
     title: str
     description: Optional[str] = None
     score: float
-    detected_at: str
-    resolved_at: Optional[str] = None
+    detected_at: datetime
+    resolved_at: Optional[datetime] = None
     status: str
     event_count: int
     sample_event_id: Optional[str] = None

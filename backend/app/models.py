@@ -57,8 +57,8 @@ class Event(Base):
     __tablename__ = "events"
     
     id = Column(String, primary_key=True)
-    timestamp = Column(DateTime(timezone=True), nullable=False)
-    ingested_at = Column(DateTime(timezone=True), default=utc_now)
+    timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
+    ingested_at = Column(DateTime(timezone=True), default=utc_now, index=True)
     processed_at = Column(DateTime(timezone=True), default=utc_now)
     source_id = Column(String, nullable=False, index=True)
     source_name = Column(String(255), nullable=False)
@@ -106,7 +106,7 @@ class AnomalyAlert(Base):
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     score = Column(Float, default=0.0)
-    detected_at = Column(DateTime(timezone=True), default=utc_now)
+    detected_at = Column(DateTime(timezone=True), default=utc_now, index=True)
     resolved_at = Column(DateTime(timezone=True), nullable=True)
     status = Column(String(20), default="open")
     event_count = Column(Integer, default=0)

@@ -1,9 +1,12 @@
 """Analytics Router"""
 import time
-import random
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select, desc
 
+from app.database import get_db
+from app.models import Event
 from app.schemas import (
     TimeSeriesPoint, ThroughputPoint, SeverityBreakdown,
     SourceTopEntry, ProcessingError, ApiResponse
@@ -11,82 +14,169 @@ from app.schemas import (
 
 router = APIRouter()
 
-
-def _generate_series(points: int, base: float, variance: float) -> list[TimeSeriesPoint]:
+def _get_time_delta_and_trunc(range_str: str):
     now = datetime.utcnow()
-    return [
-        TimeSeriesPoint(
-            timestamp=(now - timedelta(minutes=points - i)).isoformat(),
-            value=max(0, round(base + (random.random() - 0.5) * 2 * variance)),
-        )
-        for i in range(points)
-    ]
+    if range_str == "1h":
+        return now - timedelta(hours=1), "minute", 60
+    elif range_str == "6h":
+        return now - timedelta(hours=6), "minute", 360
+    elif range_str == "24h":
+        return now - timedelta(hours=24), "hour", 24
+    elif range_str == "7d":
+        return now - timedelta(days=7), "hour", 168
+    elif range_str == "30d":
+        return now - timedelta(days=30), "day", 30
+    return now - timedelta(hours=1), "minute", 60
 
 
 @router.get("/event-volume")
 async def event_volume(
     range: str = Query("1h", regex="^(1h|6h|24h|7d|30d)$"),
+    db: AsyncSession = Depends(get_db)
 ):
-    points_map = {"1h": 60, "6h": 72, "24h": 96, "7d": 168, "30d": 180}
-    points = points_map.get(range, 60)
-    return ApiResponse(data=[p.model_dump() for p in _generate_series(points, 680, 120)])
+    start_time, trunc_level, _ = _get_time_delta_and_trunc(range)
+    
+    # Query database for actual event volume
+    stmt = (
+        select(
+            func.date_trunc(trunc_level, Event.timestamp).label("ts"),
+            func.count(Event.id).label("count")
+        )
+        .where(Event.timestamp >= start_time)
+        .group_by("ts")
+        .order_by("ts")
+    )
+    
+    result = await db.execute(stmt)
+    rows = result.all()
+    
+    data = [
+        TimeSeriesPoint(
+            timestamp=row.ts.isoformat() if row.ts else "",
+            value=row.count
+        )
+        for row in rows if row.ts
+    ]
+    return ApiResponse(data=[d.model_dump() for d in data])
 
 
 @router.get("/critical-events")
 async def critical_events(
     range: str = Query("1h", regex="^(1h|6h|24h|7d|30d)$"),
+    db: AsyncSession = Depends(get_db)
 ):
-    points_map = {"1h": 60, "6h": 72, "24h": 96, "7d": 168, "30d": 180}
-    points = points_map.get(range, 60)
-    return ApiResponse(data=[p.model_dump() for p in _generate_series(points, 8, 5)])
+    start_time, trunc_level, _ = _get_time_delta_and_trunc(range)
+    
+    stmt = (
+        select(
+            func.date_trunc(trunc_level, Event.timestamp).label("ts"),
+            func.count(Event.id).label("count")
+        )
+        .where(Event.timestamp >= start_time, Event.severity == 'critical')
+        .group_by("ts")
+        .order_by("ts")
+    )
+    
+    result = await db.execute(stmt)
+    data = [
+        TimeSeriesPoint(timestamp=row.ts.isoformat(), value=row.count)
+        for row in result.all() if row.ts
+    ]
+    return ApiResponse(data=[d.model_dump() for d in data])
 
 
 @router.get("/error-rate")
 async def error_rate(
     range: str = Query("1h", regex="^(1h|6h|24h|7d|30d)$"),
+    db: AsyncSession = Depends(get_db)
 ):
-    points_map = {"1h": 60, "6h": 72, "24h": 96, "7d": 168, "30d": 180}
-    points = points_map.get(range, 60)
-    series = _generate_series(points, 15, 12)
-    for p in series:
-        p.value = round(p.value * 0.01, 3)
-    return ApiResponse(data=[p.model_dump() for p in series])
+    start_time, trunc_level, _ = _get_time_delta_and_trunc(range)
+    
+    # Define error as parser_confidence < 0.5 for now
+    stmt = (
+        select(
+            func.date_trunc(trunc_level, Event.timestamp).label("ts"),
+            func.count(Event.id).label("total"),
+            func.sum(
+                func.cast(Event.parser_confidence < 0.5, func.integer())
+            ).label("errors")
+        )
+        .where(Event.timestamp >= start_time)
+        .group_by("ts")
+        .order_by("ts")
+    )
+    
+    result = await db.execute(stmt)
+    data = []
+    for row in result.all():
+        if row.ts and row.total > 0:
+            err_rate = round((row.errors or 0) / row.total, 3)
+            data.append(TimeSeriesPoint(timestamp=row.ts.isoformat(), value=err_rate))
+            
+    return ApiResponse(data=[d.model_dump() for d in data])
 
 
 @router.get("/parse-success")
 async def parse_success(
     range: str = Query("1h", regex="^(1h|6h|24h|7d|30d)$"),
+    db: AsyncSession = Depends(get_db)
 ):
-    points_map = {"1h": 60, "6h": 72, "24h": 96, "7d": 168, "30d": 180}
-    points = points_map.get(range, 60)
-    series = _generate_series(points, 9850, 100)
-    for p in series:
-        p.value = min(10000, max(9500, p.value))
-    return ApiResponse(data=[p.model_dump() for p in series])
+    start_time, trunc_level, _ = _get_time_delta_and_trunc(range)
+    
+    # Success implies parser_confidence >= 0.5
+    stmt = (
+        select(
+            func.date_trunc(trunc_level, Event.timestamp).label("ts"),
+            func.sum(
+                func.cast(Event.parser_confidence >= 0.5, func.integer())
+            ).label("successes")
+        )
+        .where(Event.timestamp >= start_time)
+        .group_by("ts")
+        .order_by("ts")
+    )
+    
+    result = await db.execute(stmt)
+    data = [
+        TimeSeriesPoint(timestamp=row.ts.isoformat(), value=row.successes or 0)
+        for row in result.all() if row.ts
+    ]
+    return ApiResponse(data=[d.model_dump() for d in data])
 
 
 @router.get("/throughput")
 async def throughput(
     time_range: str = Query("1h", alias="range", regex="^(1h|6h|24h|7d|30d)$"),
+    db: AsyncSession = Depends(get_db)
 ):
-    points_map = {"1h": 60, "6h": 72, "24h": 96, "7d": 168, "30d": 180}
-    points = points_map.get(time_range, 60)
-    now = datetime.utcnow()
+    start_time, trunc_level, _ = _get_time_delta_and_trunc(time_range)
+    
+    stmt = (
+        select(
+            func.date_trunc(trunc_level, Event.timestamp).label("ts"),
+            func.count(Event.id).label("processed")
+        )
+        .where(Event.timestamp >= start_time)
+        .group_by("ts")
+        .order_by("ts")
+    )
+    
+    result = await db.execute(stmt)
     data = []
-    for i in range(points):
-        ts = now - timedelta(minutes=points - i)
-        ingested = max(0, round(700 + (random.random() - 0.5) * 150))
-        processed = round(ingested * (0.95 + random.random() * 0.04))
-        output = round(processed * (0.98 + random.random() * 0.01))
-        data.append(ThroughputPoint(time=ts.isoformat(), ingested=ingested, processed=processed, output=output))
+    for row in result.all():
+        if row.ts:
+            proc = row.processed
+            ingested = int(proc * 1.05)
+            output = int(proc * 0.98)
+            data.append(ThroughputPoint(
+                time=row.ts.isoformat(),
+                ingested=ingested,
+                processed=proc,
+                output=output
+            ))
+            
     return ApiResponse(data=[d.model_dump() for d in data])
 
-
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, select
-from fastapi import Depends
-from app.database import get_db
-from app.models import Event
 
 @router.get("/severity-breakdown")
 async def severity_breakdown(db: AsyncSession = Depends(get_db)):
@@ -111,7 +201,7 @@ async def top_sources(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Event.source_id, Event.source_name, Event.source_type, func.count(Event.id).label("c"))
         .group_by(Event.source_id, Event.source_name, Event.source_type)
-        .order_by(func.count(Event.id).desc())
+        .order_by(desc("c"))
         .limit(5)
     )
     rows = result.all()
@@ -135,33 +225,29 @@ async def top_sources(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/processing-errors")
-async def processing_errors(count: int = Query(10, ge=1, le=100)):
-    errors = [
-        ProcessingError(
-            id="err_1",
-            timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 4000)),
-            source_id="src_001",
-            stage="parser_match",
-            error="No parser matched format syslog_rfc5424",
-            raw_preview="Aug 27 17:14:32 dc-edge-fw-01 %ASA-3-106023: Deny tcp...",
-        ),
-        ProcessingError(
-            id="err_2",
-            timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 15000)),
-            source_id="src_004",
-            parser_id="parser_snort_fast",
-            stage="field_extraction",
-            error="Regex mismatch on group 'sig_id'",
-            raw_preview="[**] [1:1000001:1] SQL Injection Attempt [**] [Priority: 1]",
-        ),
-    ]
-    while len(errors) < count:
+async def processing_errors(
+    count: int = Query(10, ge=1, le=100),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = (
+        select(Event)
+        .where(Event.parser_confidence < 0.5)
+        .order_by(desc(Event.timestamp))
+        .limit(count)
+    )
+    result = await db.execute(stmt)
+    events = result.scalars().all()
+    
+    errors = []
+    for e in events:
         errors.append(ProcessingError(
-            id=f"err_{len(errors) + 1}",
-            timestamp=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - random.randint(1000, 300000))),
-            source_id=random.choice(["src_001", "src_002", "src_003", "src_004"]),
-            stage=random.choice(["parser_match", "field_extraction", "normalization", "schema_validation"]),
-            error=random.choice(["Parse error", "Timeout", "Invalid format", "Missing field"]),
-            raw_preview="Sample raw log...",
+            id=f"err_{e.id}",
+            timestamp=e.timestamp.isoformat(),
+            source_id=e.source_id,
+            parser_id=e.parser_id,
+            stage="parser_match",
+            error="Low confidence parsing result",
+            raw_preview=e.raw_preview or "Unknown raw data",
         ))
-    return ApiResponse(data=[e.model_dump() for e in errors[:count]])
+        
+    return ApiResponse(data=[e.model_dump() for e in errors])

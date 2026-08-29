@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 
 from app.database import AsyncSessionLocal
-from app.models import Event
+from app.models import Event, AnomalyAlert
 from sqlalchemy import delete
 
 # State tracking
@@ -92,7 +92,7 @@ async def process_log_line(line: str):
                 data[field] = datetime.fromisoformat(data[field])
         
         async with AsyncSessionLocal() as session:
-            event = Event(
+            db_event = Event(
                 id=data["id"],
                 timestamp=data["timestamp"],
                 ingested_at=data["ingested_at"],
@@ -115,13 +115,30 @@ async def process_log_line(line: str):
                 parser_confidence=data["parser_confidence"],
                 schema_coverage=data["schema_coverage"],
                 lineage=[
-                    {"stage": "ingest", "status": "success", "duration_ms": 0.8},
-                    {"stage": "storage", "status": "success", "duration_ms": 4.1},
+                    {"stage": "ingest", "status": "success", "duration_ms": 0.8, "detail": "Event received", "timestamp": data["timestamp"].isoformat()},
+                    {"stage": "storage", "status": "success", "duration_ms": 4.1, "detail": "Stored", "timestamp": data["processed_at"].isoformat()},
                 ],
                 downstream=[],
                 extra_fields={}
             )
-            session.add(event)
+            session.add(db_event)
+            
+            # Generate occasional AnomalyAlert for high/critical events to populate Detections
+            if data["severity"] in ["high", "critical"] and random.random() < 0.05:
+                alert = AnomalyAlert(
+                    id=f"alert_{uuid.uuid4().hex[:8]}",
+                    alert_type="ml_outlier" if random.random() > 0.5 else "rule_trigger",
+                    severity=data["severity"],
+                    source_id=data["source_id"],
+                    source_name=data["source_name"],
+                    title=f"Suspicious activity on {data['source_name']}",
+                    description=f"Automated detection triggered by event: {data['action']}",
+                    score=round(random.uniform(70.0, 99.0), 1),
+                    event_count=random.randint(5, 50),
+                    sample_event_id=db_event.id
+                )
+                session.add(alert)
+
             await session.commit()
     except Exception as e:
         print(f"[Ingester] Error processing line: {e}")
