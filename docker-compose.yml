@@ -17,7 +17,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ulpf -d ulpf"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 15
     restart: unless-stopped
 
   # ── Redis ──────────────────────────────────────────────────────
@@ -32,7 +32,7 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 15
     restart: unless-stopped
 
   # ── MinIO ──────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ services:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 15
     restart: unless-stopped
 
   # ── OpenSearch ─────────────────────────────────────────────────
@@ -76,7 +76,7 @@ services:
       test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 15
     restart: unless-stopped
 
   # ── Kafka + Zookeeper ──────────────────────────────────────────
@@ -155,7 +155,7 @@ services:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 15
 
   # ── ULPF Kafka Worker ──────────────────────────────────────────
   worker:
@@ -184,7 +184,8 @@ services:
     depends_on:
       - backend
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      NEXT_PUBLIC_API_URL: ""
+      BACKEND_URL: http://backend:8000
     # ports:
     #   - "3000:3000"
     restart: unless-stopped
