@@ -157,7 +157,7 @@ pytest tests/
 
 The core ULPF pipeline works without internet access:
 - Disable `AI_ENABLED=false` in `.env`
-- AI features gracefully fall back to deterministic field mapping
+- AI features seamlessly fall back to reliable, deterministic field mapping when needed.
 - Parsing, normalization, and data storage processes continue to function without interruption.
 
 
