@@ -400,3 +400,33 @@ class RawEventOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ── Auth & User Schemas ────────────────────────────────────────
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: Optional[str] = None
+
+
+class UserBase(BaseModel):
+    username: str
+    email: str
+    is_active: bool = True
+    is_superuser: bool = False
+
+
+class UserCreate(UserBase):
+    password: str
+
+
+class UserOut(UserBase):
+    id: str
+    created_at: str
+
+    class Config:
+        from_attributes = True
