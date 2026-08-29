@@ -23,21 +23,18 @@ export default function PipelinePage() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    // If we're paused and already have data, don't load new events (freeze stream)
-    // but we can still load pipeline metrics if we wanted. For realism, freeze all.
-    if (!liveFeedActive && events.length > 0) return;
-
     const [pipe, evts] = await Promise.all([
       getPipelineMetrics(),
       getRecentEvents(50),
     ]);
-    
     setPipeline(pipe);
     setEvents(evts);
-  }, [liveFeedActive, events.length]);
+  }, []);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch; state updates happen after await
+    void load();
+  }, [load]);
   useInterval(load, liveFeedActive ? 2000 : null);
 
   const selectedEvent = events.find(e => e.id === selectedEventId) || null;
