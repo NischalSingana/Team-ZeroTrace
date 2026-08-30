@@ -24,13 +24,13 @@ import {
   getTopSources,
   getEventVolume,
 } from "@/lib/services/analytics";
-import type { ThroughputPoint, SeverityBreakdown, SourceTopEntry, TimeSeriesPoint } from "@/lib/types";
+import type { ThroughputPoint, SeverityBreakdown, SourceTopEntry, TimeSeriesPoint, EventVolumePoint } from "@/lib/types";
 
 interface AnalyticsData {
   throughput: ThroughputPoint[];
   severity: SeverityBreakdown | null;
   topSources: SourceTopEntry[];
-  volume: TimeSeriesPoint[];
+  volume: EventVolumePoint[];
   // static supplemental data
   topIps: typeof TOP_IPS;
   topUsers: typeof TOP_USERS;

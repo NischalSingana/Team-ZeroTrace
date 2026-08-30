@@ -249,11 +249,12 @@ export default function OverviewPage() {
     try {
       // Sources are always fetched so the configured source list is visible;
       // their metrics are computed from actual events and will be zero when paused.
-      const srcs = await fetchSources();
-      setSources(srcs.slice(0, 8));
+      const sourcesPromise = fetchSources();
 
       if (!liveFeedActive) {
         // When the pipeline is paused, show idle/empty state instead of stale demo data.
+        const srcs = await sourcesPromise;
+        setSources(srcs.slice(0, 8));
         setEvents([]);
         setPipeline(null);
         setAlerts([]);
@@ -266,7 +267,8 @@ export default function OverviewPage() {
         return;
       }
 
-      const [evts, pipe, alts, vol, crit, thru, errs] = await Promise.all([
+      const [srcs, evts, pipe, alts, vol, crit, thru, errs] = await Promise.all([
+        sourcesPromise,
         getRecentEvents(20),
         getPipelineMetrics(),
         getAnomalyAlerts(),
@@ -275,6 +277,7 @@ export default function OverviewPage() {
         getThroughput("1h"),
         getProcessingErrors(15),
       ]);
+      setSources(srcs.slice(0, 8));
       setEvents((prev) => {
         const prevIds = new Set(prev.map((e) => e.id));
         const newIds = new Set(evts.filter((e) => !prevIds.has(e.id)).map((e) => e.id));

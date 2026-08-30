@@ -323,6 +323,17 @@ export interface TimeSeriesPoint {
   value: number;
 }
 
+export interface EventVolumePoint {
+  time: string;
+  value: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  info: number;
+  unknown: number;
+}
+
 export interface ThroughputPoint {
   time: string;
   ingested: number;

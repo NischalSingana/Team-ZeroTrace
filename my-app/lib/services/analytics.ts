@@ -2,6 +2,7 @@ import { fetchJson } from "./api";
 import type {
   TimeRange,
   TimeSeriesPoint,
+  EventVolumePoint,
   SeverityBreakdown,
   SourceTopEntry,
   ThroughputPoint,
@@ -11,9 +12,9 @@ import type {
 const MOCK_DELAY = () =>
   new Promise((r) => setTimeout(r, Math.random() * 80 + 30));
 
-export async function getEventVolume(range: TimeRange): Promise<TimeSeriesPoint[]> {
+export async function getEventVolume(range: TimeRange): Promise<EventVolumePoint[]> {
   await MOCK_DELAY();
-  return fetchJson<TimeSeriesPoint[]>(`/api/analytics/event-volume?range=${range}`);
+  return fetchJson<EventVolumePoint[]>(`/api/analytics/event-volume?range=${range}`);
 }
 
 export async function getCriticalEvents(range: TimeRange): Promise<TimeSeriesPoint[]> {

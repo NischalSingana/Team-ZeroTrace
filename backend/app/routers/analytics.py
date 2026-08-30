@@ -9,7 +9,7 @@ from app.database import get_db
 from app.models import Event
 from app.schemas import (
     TimeSeriesPoint, ThroughputPoint, SeverityBreakdown,
-    SourceTopEntry, ProcessingError, ApiResponse
+    SourceTopEntry, ProcessingError, ApiResponse, EventVolumePoint
 )
 
 router = APIRouter()
@@ -40,23 +40,30 @@ async def event_volume(
     stmt = (
         select(
             func.date_trunc(trunc_level, Event.timestamp).label("ts"),
+            Event.severity,
             func.count(Event.id).label("count")
         )
         .where(Event.timestamp >= start_time)
-        .group_by("ts")
+        .group_by("ts", Event.severity)
         .order_by("ts")
     )
     
     result = await db.execute(stmt)
     rows = result.all()
     
-    data = [
-        TimeSeriesPoint(
-            timestamp=row.ts.isoformat() if row.ts else "",
-            value=row.count
-        )
-        for row in rows if row.ts
-    ]
+    grouped = {}
+    for row in rows:
+        if not row.ts:
+            continue
+        ts_str = row.ts.isoformat()
+        if ts_str not in grouped:
+            grouped[ts_str] = {"time": ts_str, "value": 0, "critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0, "unknown": 0}
+        
+        sev = row.severity if row.severity in grouped[ts_str] else "unknown"
+        grouped[ts_str][sev] = row.count
+        grouped[ts_str]["value"] += row.count
+        
+    data = [EventVolumePoint(**g) for g in grouped.values()]
     return ApiResponse(data=[d.model_dump() for d in data])
 
 

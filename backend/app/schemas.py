@@ -348,6 +348,17 @@ class TimeSeriesPoint(BaseModel):
     value: float
 
 
+class EventVolumePoint(BaseModel):
+    time: str
+    value: int = 0
+    critical: int = 0
+    high: int = 0
+    medium: int = 0
+    low: int = 0
+    info: int = 0
+    unknown: int = 0
+
+
 class ThroughputPoint(BaseModel):
     time: str
     ingested: int
