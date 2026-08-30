@@ -43,6 +43,7 @@ async def _compute_source_metrics(db, source_id: str):
         .where(Event.source_id == source_id, Event.timestamp >= last_minute)
     )
     total, successes = (await db.execute(quality_stmt)).one_or_none() or (0, 0)
+    successes = successes or 0
     parse_success_rate = (successes / total) if total else 1.0
     error_rate = 1.0 - parse_success_rate
 
