@@ -34,6 +34,7 @@ export default function DetectionsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [detections, setDetections] = useState<DetectionItem[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -119,13 +120,15 @@ export default function DetectionsPage() {
               ) : (
                 detections.map((item, idx) => {
                   const riskColor = getRiskColor(item.severity);
+                  const isSelected = selectedId ? item.id === selectedId : idx === 0;
                   return (
                     <div
                       key={item.id}
+                      onClick={() => setSelectedId(item.id)}
                       className={`p-4 border-b border-[#1e2d3d] cursor-pointer transition-colors ${
-                        idx === 0 ? "bg-[#1c2433]/50 border-l-2" : "border-[#1e2d3d]/50 hover:bg-[#0d1117] opacity-75"
+                        isSelected ? "bg-[#1c2433]/50 border-l-2" : "border-[#1e2d3d]/50 hover:bg-[#0d1117] opacity-75"
                       }`}
-                      style={{ borderLeftColor: idx === 0 ? riskColor : undefined }}
+                      style={{ borderLeftColor: isSelected ? riskColor : undefined }}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <span
@@ -178,34 +181,37 @@ export default function DetectionsPage() {
               <>
                 {/* Header Area */}
                 {detections.length > 0 ? (
-                <>
-                <div className="p-8 border-b border-[#1e2d3d] bg-gradient-to-b from-[#ef4444]/5 to-transparent">
-                  <div className="flex items-start justify-between mb-6">
-                    <div>
-                      <div className="flex items-center gap-3 mb-2">
-                        {getSignalIcon(detections[0].alert_type)}
-                        <h1 className="text-2xl font-bold text-[#e2e8f0] tracking-tight">{detections[0].title}</h1>
-                      </div>
-                      <p className="text-[#94a3b8] text-sm max-w-2xl">
-                        {detections[0].description}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <MetricLabel
-                        label="Confidence Score"
-                        tooltip="Model confidence that the observed signals represent a true attack."
-                        className="text-[10px] text-[#64748b] uppercase tracking-widest font-bold mb-1 font-mono"
-                      />
-                      <div className="text-4xl font-light text-[#ef4444] font-mono">{detections[0].score}%</div>
-                    </div>
-                  </div>
-
-                  {/* Signal Grid */}
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="bg-[#0a0d12] border border-[#1e2d3d] rounded p-4 flex items-center gap-4">
-                      <div className="p-2 bg-[#ef4444]/10 rounded border border-[#ef4444]/20"><ShieldAlert className="w-5 h-5 text-[#ef4444]" /></div>
+                (() => {
+                  const selectedDetection = detections.find(d => d.id === selectedId) || detections[0];
+                  return (
+                  <>
+                  <div className="p-8 border-b border-[#1e2d3d] bg-gradient-to-b from-[#ef4444]/5 to-transparent">
+                    <div className="flex items-start justify-between mb-6">
                       <div>
-                        <div className="text-xl font-bold text-[#e2e8f0]">{detections[0].event_count}</div>
+                        <div className="flex items-center gap-3 mb-2">
+                          {getSignalIcon(selectedDetection.alert_type)}
+                          <h1 className="text-2xl font-bold text-[#e2e8f0] tracking-tight">{selectedDetection.title}</h1>
+                        </div>
+                        <p className="text-[#94a3b8] text-sm max-w-2xl">
+                          {selectedDetection.description}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <MetricLabel
+                          label="Confidence Score"
+                          tooltip="Model confidence that the observed signals represent a true attack."
+                          className="text-[10px] text-[#64748b] uppercase tracking-widest font-bold mb-1 font-mono"
+                        />
+                        <div className="text-4xl font-light text-[#ef4444] font-mono">{selectedDetection.score}%</div>
+                      </div>
+                    </div>
+
+                    {/* Signal Grid */}
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="bg-[#0a0d12] border border-[#1e2d3d] rounded p-4 flex items-center gap-4">
+                        <div className="p-2 bg-[#ef4444]/10 rounded border border-[#ef4444]/20"><ShieldAlert className="w-5 h-5 text-[#ef4444]" /></div>
+                        <div>
+                          <div className="text-xl font-bold text-[#e2e8f0]">{selectedDetection.event_count}</div>
                         <MetricLabel
                           label="Total Events"
                           tooltip="Total events involved in this detection."
@@ -294,6 +300,8 @@ export default function DetectionsPage() {
 
                 </div>
                 </>
+                  );
+                })()
                 ) : (
                   <div className="h-full flex items-center justify-center">
                     <EmptyState
