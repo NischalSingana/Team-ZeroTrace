@@ -245,8 +245,8 @@ export default function OverviewPage() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set());
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     setError(null);
     try {
       // Sources are always fetched so the configured source list is visible;
@@ -307,7 +307,7 @@ export default function OverviewPage() {
 
   // Initial data load
   useEffect(() => {
-    void load();
+    void load(true);
   }, [load]);
 
   // Clear new event highlights
