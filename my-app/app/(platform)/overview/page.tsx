@@ -9,7 +9,6 @@ import { Skeleton, SkeletonBlock, SkeletonMetric } from "@/components/ui/skeleto
 import { Timestamp } from "@/components/ui/timestamp";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { BackendErrorState } from "@/components/ui/error-fallback";
 import { Tooltip, MetricLabel } from "@/components/ui/tooltip";
 import { getRecentEvents } from "@/lib/services/events";
 import { getPipelineMetrics, getStreamState } from "@/lib/services/pipeline";
@@ -21,7 +20,6 @@ import {
   getProcessingErrors,
 } from "@/lib/services/analytics";
 import { fetchSources } from "@/lib/services/sources";
-import { isOfflineError } from "@/lib/services/api";
 import { useUIStore } from "@/lib/store/ui";
 import { useInterval } from "@/lib/utils/hooks";
 import { formatNumber, formatRate, formatPercent, formatDuration } from "@/lib/utils/format";
@@ -325,13 +323,6 @@ export default function OverviewPage() {
   const totalEventsPerSec = pipeline?.total_events_per_sec ?? 0;
   const parseRate = pipeline?.parse_success_rate ?? 0;
 
-  const errorTitle = isOfflineError(error)
-    ? "Backend is offline"
-    : "Failed to load overview";
-  const errorDescription = isOfflineError(error)
-    ? "Could not reach the ZeroTrace API. Start the backend service and try again."
-    : "Could not load dashboard data. Check the backend status and retry.";
-
   return (
     <div className="flex flex-col h-full">
       <PageHeader
@@ -348,7 +339,7 @@ export default function OverviewPage() {
             <Button
               variant="ghost"
               size="xs"
-              onClick={load}
+              onClick={() => load(true)}
               leftIcon={<RefreshCw className="w-3 h-3" />}
             >
               Refresh
