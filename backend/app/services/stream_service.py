@@ -109,7 +109,8 @@ def _pick_source(scenario: str) -> Dict[str, Any]:
         "k8s_api": ["src_007"],
     }
     src_ids = mapping.get(scenario, [s["id"] for s in SOURCES])
-    return next(s for s in SOURCES if s["id"] == random.choice(src_ids))
+    chosen_id = random.choice(src_ids)
+    return next(s for s in SOURCES if s["id"] == chosen_id)
 
 
 def _build_event(scenario: str, source: Dict[str, Any], ts: datetime) -> Dict[str, Any]:
