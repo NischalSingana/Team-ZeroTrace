@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { getPipelineMetrics, pauseStream, resumeStream, restartStream } from "@/lib/services/pipeline";
+import { getPipelineMetrics, pauseStream, resumeStream, restartStream, getStreamState } from "@/lib/services/pipeline";
 import { getRecentEvents } from "@/lib/services/events";
 import { useUIStore } from "@/lib/store/ui";
 import { useInterval } from "@/lib/utils/hooks";
@@ -17,7 +17,7 @@ import { PipelineCanvas, LiveStream, EventInspector } from "./components";
 
 
 export default function PipelinePage() {
-  const { liveFeedActive, toggleLiveFeed } = useUIStore();
+  const { liveFeedActive, toggleLiveFeed, setLiveFeedActive } = useUIStore();
   const [pipeline, setPipeline] = useState<PipelineMetrics | null>(null);
   const [events, setEvents] = useState<NormalizedEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -25,11 +25,19 @@ export default function PipelinePage() {
   const load = useCallback(async () => {
     const [pipe, evts] = await Promise.all([
       getPipelineMetrics(),
-      getRecentEvents(50),
+      liveFeedActive ? getRecentEvents(50) : Promise.resolve([] as NormalizedEvent[]),
     ]);
     setPipeline(pipe);
     setEvents(evts);
-  }, []);
+  }, [liveFeedActive]);
+
+  // Sync local streaming toggle with the backend state on mount.
+  useEffect(() => {
+    void getStreamState().then((state) => {
+      const streaming = state.is_streaming ?? state.status === "streaming";
+      setLiveFeedActive(streaming);
+    });
+  }, [setLiveFeedActive]);
 
   useEffect(() => {
     void load();
@@ -102,10 +110,11 @@ export default function PipelinePage() {
       {/* Main 3-Column Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Event Stream */}
-        <LiveStream 
-          events={events} 
-          selectedId={selectedEventId} 
-          onSelect={handleSelectEvent} 
+        <LiveStream
+          events={events}
+          selectedId={selectedEventId}
+          onSelect={handleSelectEvent}
+          isStreaming={liveFeedActive}
         />
         
         {/* Center: Visual Pipeline */}

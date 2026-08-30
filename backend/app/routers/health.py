@@ -1,8 +1,12 @@
 """Health Router"""
 import time
 import random
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy import select, desc
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import get_db
+from app.models import AnomalyAlert
 from app.schemas import SystemHealth, SystemMetric, SystemService, AnomalyAlertOut, ApiResponse
 from app.config import settings
 
@@ -97,37 +101,16 @@ def _generate_health() -> SystemHealth:
     )
 
 
-def _generate_anomalies() -> list[AnomalyAlertOut]:
-    return [
-        AnomalyAlertOut(
-            id="ano_001",
-            alert_type="brute_force",
-            severity="critical",
-            source_id="src_009",
-            source_name="Snort IDS — PERIMETER",
-            title="SSH Brute Force — Tor Exit Node",
-            description="497 failed SSH authentication attempts in 8 minutes from known Tor exit node 185.220.101.47.",
-            score=0.97,
-            detected_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 45000)),
-            status="investigating",
-            event_count=497,
-            sample_event_id="evt_c001",
-        ),
-        AnomalyAlertOut(
-            id="ano_002",
-            alert_type="privilege_escalation",
-            severity="high",
-            source_id="src_005",
-            source_name="AWS CloudTrail — Production Account",
-            title="IAM Privilege Escalation Attempt",
-            description="CI/CD service account attempted to assume ProductionAdmin role.",
-            score=0.88,
-            detected_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 75000)),
-            status="open",
-            event_count=3,
-            sample_event_id="evt_h002",
-        ),
-    ]
+async def _generate_anomalies(db: AsyncSession) -> list[AnomalyAlertOut]:
+    """Return real anomaly alerts from the database."""
+    stmt = (
+        select(AnomalyAlert)
+        .order_by(desc(AnomalyAlert.detected_at))
+        .limit(50)
+    )
+    result = await db.execute(stmt)
+    alerts = result.scalars().all()
+    return [AnomalyAlertOut.model_validate(a) for a in alerts]
 
 
 @router.get("/system", response_model=ApiResponse)
@@ -136,5 +119,6 @@ async def get_system_health():
 
 
 @router.get("/anomalies", response_model=ApiResponse)
-async def get_anomalies():
-    return ApiResponse(data=[a.model_dump() for a in _generate_anomalies()])
+async def get_anomalies(db: AsyncSession = Depends(get_db)):
+    alerts = await _generate_anomalies(db)
+    return ApiResponse(data=[a.model_dump() for a in alerts])

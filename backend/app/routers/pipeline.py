@@ -1,136 +1,224 @@
 """Pipeline Router"""
-import time
+import os
 import random
-from fastapi import APIRouter
+import time
+from datetime import datetime, timezone, timedelta
+from fastapi import APIRouter, Depends
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import get_db
+from app.models import Event
 from app.schemas import PipelineMetrics, PipelineStageMetrics, ApiResponse
 from app.services.stream_service import pause_stream, resume_stream, restart_stream, stream_state
 
 router = APIRouter()
 
 
-def _generate_pipeline_metrics() -> PipelineMetrics:
-    stages = [
-        PipelineStageMetrics(
-            stage="ingest",
-            label="Ingest",
-            events_per_sec=random.randint(650, 720),
-            avg_latency_ms=round(random.uniform(0.6, 1.0), 1),
-            p95_latency_ms=round(random.uniform(1.8, 2.5), 1),
-            error_rate=round(random.uniform(0.0001, 0.0005), 4),
-            queue_depth=random.randint(1000, 1500),
-            active_workers=8,
-            status="healthy",
-        ),
-        PipelineStageMetrics(
-            stage="format_detection",
-            label="Format Detection",
-            events_per_sec=random.randint(640, 710),
-            avg_latency_ms=round(random.uniform(1.2, 1.8), 1),
-            p95_latency_ms=round(random.uniform(2.8, 3.8), 1),
-            error_rate=round(random.uniform(0.0005, 0.0015), 4),
-            queue_depth=random.randint(700, 1000),
-            active_workers=4,
-            status="healthy",
-        ),
-        PipelineStageMetrics(
-            stage="parser_match",
-            label="Parser Match",
-            events_per_sec=random.randint(630, 700),
-            avg_latency_ms=round(random.uniform(0.4, 0.8), 1),
-            p95_latency_ms=round(random.uniform(1.2, 2.0), 1),
-            error_rate=round(random.uniform(0.0008, 0.0020), 4),
-            queue_depth=random.randint(300, 600),
-            active_workers=4,
-            status="healthy",
-        ),
-        PipelineStageMetrics(
-            stage="field_extraction",
-            label="Field Extraction",
-            events_per_sec=random.randint(620, 690),
-            avg_latency_ms=round(random.uniform(2.2, 3.5), 1),
-            p95_latency_ms=round(random.uniform(6.0, 10.0), 1),
-            error_rate=round(random.uniform(0.0020, 0.0050), 4),
-            queue_depth=random.randint(1500, 2300),
-            active_workers=12,
-            status="healthy",
-        ),
-        PipelineStageMetrics(
-            stage="normalization",
-            label="Normalization",
-            events_per_sec=random.randint(610, 680),
-            avg_latency_ms=round(random.uniform(1.5, 2.5), 1),
-            p95_latency_ms=round(random.uniform(3.5, 6.0), 1),
-            error_rate=round(random.uniform(0.0001, 0.0005), 4),
-            queue_depth=random.randint(500, 800),
-            active_workers=8,
-            status="healthy",
-        ),
-        PipelineStageMetrics(
-            stage="schema_validation",
-            label="Schema Validation",
-            events_per_sec=random.randint(605, 675),
-            avg_latency_ms=round(random.uniform(0.5, 1.0), 1),
-            p95_latency_ms=round(random.uniform(1.2, 2.5), 1),
-            error_rate=round(random.uniform(0.0010, 0.0030), 4),
-            queue_depth=random.randint(150, 300),
-            active_workers=4,
-            status="healthy",
-        ),
-        PipelineStageMetrics(
-            stage="enrichment",
-            label="Enrichment",
-            events_per_sec=random.randint(600, 670),
-            avg_latency_ms=round(random.uniform(3.5, 5.5), 1),
-            p95_latency_ms=round(random.uniform(10.0, 16.0), 1),
-            error_rate=round(random.uniform(0.0003, 0.0010), 4),
-            queue_depth=random.randint(800, 1200),
-            active_workers=6,
-            status=random.choice(["healthy", "degraded"]),
-        ),
-        PipelineStageMetrics(
-            stage="output",
-            label="Output",
-            events_per_sec=random.randint(595, 665),
-            avg_latency_ms=round(random.uniform(4.0, 6.5), 1),
-            p95_latency_ms=round(random.uniform(12.0, 18.0), 1),
-            error_rate=round(random.uniform(0.00005, 0.0003), 4),
-            queue_depth=random.randint(250, 450),
-            active_workers=4,
-            status="healthy",
-        ),
-    ]
-    
+STAGE_ORDER = [
+    "ingest",
+    "format_detection",
+    "parser_match",
+    "field_extraction",
+    "normalization",
+    "schema_validation",
+    "enrichment",
+    "output",
+]
+
+STAGE_LABELS = {
+    "ingest": "Ingest",
+    "format_detection": "Format Detection",
+    "parser_match": "Parser Match",
+    "field_extraction": "Field Extraction",
+    "normalization": "Normalization",
+    "schema_validation": "Schema Validation",
+    "enrichment": "Enrichment",
+    "output": "Output",
+}
+
+
+def _idle_metrics() -> PipelineMetrics:
+    """Return zeroed pipeline metrics when the stream is paused."""
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     return PipelineMetrics(
-        total_events_per_sec=stages[0].events_per_sec,
-        total_events_today=random.randint(35_000_000, 45_000_000),
-        parse_success_rate=round(random.uniform(0.97, 0.995), 4),
-        normalization_coverage=round(random.uniform(0.85, 0.94), 4),
-        enrichment_rate=round(random.uniform(0.80, 0.90), 4),
-        error_rate=round(random.uniform(0.005, 0.02), 4),
-        kafka_consumer_lag=random.randint(2000, 3500),
+        total_events_per_sec=0,
+        total_events_today=0,
+        parse_success_rate=0.0,
+        normalization_coverage=0.0,
+        enrichment_rate=0.0,
+        error_rate=0.0,
+        kafka_consumer_lag=0,
+        stages=[
+            PipelineStageMetrics(
+                stage=stage,
+                label=STAGE_LABELS[stage],
+                events_per_sec=0,
+                avg_latency_ms=0.0,
+                p95_latency_ms=0.0,
+                error_rate=0.0,
+                queue_depth=0,
+                active_workers=_active_workers(stage),
+                status="idle",
+            )
+            for stage in STAGE_ORDER
+        ],
+        last_updated=now,
+    )
+
+
+def _active_workers(stage: str) -> int:
+    return {
+        "ingest": 8,
+        "format_detection": 4,
+        "parser_match": 4,
+        "field_extraction": 12,
+        "normalization": 8,
+        "schema_validation": 4,
+        "enrichment": 6,
+        "output": 4,
+    }.get(stage, 4)
+
+
+def _stage_status(error_rate: float) -> str:
+    if error_rate >= 0.05:
+        return "error"
+    if error_rate >= 0.01:
+        return "degraded"
+    return "healthy"
+
+
+async def _generate_pipeline_metrics(db: AsyncSession) -> PipelineMetrics:
+    """Derive pipeline metrics from the actual events in the database."""
+    now = datetime.now(timezone.utc)
+    window_start = now - timedelta(minutes=1)
+    today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+
+    # Total events today
+    today_count_result = await db.execute(
+        select(func.count(Event.id)).where(Event.timestamp >= today_start)
+    )
+    total_events_today = today_count_result.scalar() or 0
+
+    # Events in the last minute for rate calculations
+    window_result = await db.execute(
+        select(Event).where(Event.timestamp >= window_start)
+    )
+    window_events = window_result.scalars().all()
+
+    if not window_events:
+        idle = _idle_metrics()
+        idle.total_events_today = total_events_today
+        return idle
+
+    total_in_window = len(window_events)
+    events_per_sec = round(total_in_window / 60.0, 1)
+
+    # Aggregate stats
+    confidences = [e.parser_confidence or 0 for e in window_events]
+    coverages = [e.schema_coverage or 0 for e in window_events]
+    parse_success_rate = sum(1 for c in confidences if c >= 0.5) / total_in_window
+    normalization_coverage = sum(coverages) / total_in_window
+    error_rate = 1 - parse_success_rate
+
+    # Enrichment rate: events with downstream refs or enrichment tags
+    enriched_count = sum(
+        1 for e in window_events
+        if e.downstream or any("enrich" in (t or "") for t in (e.tags or []))
+    )
+    enrichment_rate = enriched_count / total_in_window
+
+    # Per-stage metrics derived from event lineage
+    stage_stats: dict = {s: {"durations": [], "errors": 0, "count": 0} for s in STAGE_ORDER}
+
+    for event in window_events:
+        lineage = event.lineage or []
+        for step in lineage:
+            stage = step.get("stage")
+            if stage not in stage_stats:
+                continue
+            stage_stats[stage]["count"] += 1
+            duration = step.get("duration_ms")
+            if isinstance(duration, (int, float)):
+                stage_stats[stage]["durations"].append(duration)
+            if step.get("status") == "error":
+                stage_stats[stage]["errors"] += 1
+
+    stages = []
+    for stage in STAGE_ORDER:
+        stats = stage_stats[stage]
+        count = stats["count"]
+        eps = round(count / 60.0, 1) if count else 0
+        durations = stats["durations"]
+        avg_latency = round(sum(durations) / len(durations), 1) if durations else 0.0
+        sorted_durations = sorted(durations)
+        p95 = round(sorted_durations[int(len(sorted_durations) * 0.95)] if sorted_durations else 0.0, 1)
+        stage_error_rate = stats["errors"] / count if count else 0.0
+
+        stages.append(
+            PipelineStageMetrics(
+                stage=stage,
+                label=STAGE_LABELS[stage],
+                events_per_sec=int(eps),
+                avg_latency_ms=avg_latency,
+                p95_latency_ms=p95,
+                error_rate=round(stage_error_rate, 4),
+                queue_depth=int(count * random.uniform(1.0, 2.0)) if count else 0,
+                active_workers=_active_workers(stage),
+                status=_stage_status(stage_error_rate),
+            )
+        )
+
+    # Kafka lag estimate: events written to stream.log but not yet ingested.
+    lag = 0
+    try:
+        if os.path.exists(stream_state.file_path):
+            with open(stream_state.file_path, "r") as f:
+                f.seek(stream_state.offset)
+                lag = sum(1 for _ in iter(f.readline, ""))
+    except Exception:
+        lag = 0
+
+    return PipelineMetrics(
+        total_events_per_sec=int(events_per_sec),
+        total_events_today=total_events_today,
+        parse_success_rate=round(parse_success_rate, 4),
+        normalization_coverage=round(normalization_coverage, 4),
+        enrichment_rate=round(enrichment_rate, 4),
+        error_rate=round(error_rate, 4),
+        kafka_consumer_lag=lag,
         stages=stages,
         last_updated=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     )
 
 
 @router.get("/metrics", response_model=ApiResponse)
-async def get_metrics():
-    metrics = _generate_pipeline_metrics()
-    # Optional: adjust metrics slightly if paused
+async def get_metrics(db: AsyncSession = Depends(get_db)):
     if not stream_state.is_streaming:
-        metrics.total_events_per_sec = 0
-        for stage in metrics.stages:
-            stage.events_per_sec = 0
+        return ApiResponse(data=_idle_metrics().model_dump())
+    metrics = await _generate_pipeline_metrics(db)
     return ApiResponse(data=metrics.model_dump())
+
+
+@router.get("/stream/state", response_model=ApiResponse)
+async def get_stream_state():
+    return ApiResponse(
+        data={
+            "is_streaming": stream_state.is_streaming,
+            "status": "streaming" if stream_state.is_streaming else "paused",
+        }
+    )
+
 
 @router.post("/stream/pause")
 async def api_pause_stream():
     return await pause_stream()
 
+
 @router.post("/stream/resume")
 async def api_resume_stream():
     return await resume_stream()
+
 
 @router.post("/stream/restart")
 async def api_restart_stream():

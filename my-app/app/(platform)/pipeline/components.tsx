@@ -126,25 +126,34 @@ export function LiveStream({
   events,
   selectedId,
   onSelect,
+  isStreaming = true,
 }: {
   events: NormalizedEvent[];
   selectedId: string | null;
   onSelect: (e: NormalizedEvent) => void;
+  isStreaming?: boolean;
 }) {
   return (
     <div className="flex flex-col h-full bg-[#050709] border-r border-[#1e2d3d] w-[340px] flex-shrink-0">
       <div className="px-4 py-3 border-b border-[#1e2d3d] bg-[#0d1117]">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-[#3b82f6]" />
+            <Zap className={`w-4 h-4 ${isStreaming ? "text-[#3b82f6]" : "text-[#64748b]"}`} />
             <span className="text-[#e2e8f0] text-sm font-semibold tracking-wide">
-              Live Ingest
+              {isStreaming ? "Live Ingest" : "Ingest Paused"}
             </span>
           </div>
-          <span className="flex items-center gap-1.5 text-[#86efac] text-[9px] font-mono uppercase bg-[#052e16] px-1.5 py-0.5 rounded border border-[#22c55e]/30">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse" />
-            Streaming
-          </span>
+          {isStreaming ? (
+            <span className="flex items-center gap-1.5 text-[#86efac] text-[9px] font-mono uppercase bg-[#052e16] px-1.5 py-0.5 rounded border border-[#22c55e]/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] animate-pulse" />
+              Streaming
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-[#94a3b8] text-[9px] font-mono uppercase bg-[#1e293b] px-1.5 py-0.5 rounded border border-[#475569]/30">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#64748b]" />
+              Paused
+            </span>
+          )}
         </div>
         <div className="text-[#64748b] text-[10px] font-mono">
            {formatNumber(events.length)} events captured

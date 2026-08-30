@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { BackendErrorState } from "@/components/ui/error-fallback";
 import { Tooltip, MetricLabel } from "@/components/ui/tooltip";
 import { getRecentEvents } from "@/lib/services/events";
-import { getPipelineMetrics } from "@/lib/services/pipeline";
+import { getPipelineMetrics, getStreamState } from "@/lib/services/pipeline";
 import { getAnomalyAlerts } from "@/lib/services/health";
 import {
   getEventVolume,
@@ -230,7 +230,7 @@ function SourceRow({ source }: { source: LogSource }) {
 // ════════════════════════════════════════════════════════════════
 
 export default function OverviewPage() {
-  const { liveFeedActive } = useUIStore();
+  const { liveFeedActive, setLiveFeedActive } = useUIStore();
 
   const [events, setEvents] = useState<NormalizedEvent[]>([]);
   const [pipeline, setPipeline] = useState<PipelineMetrics | null>(null);
@@ -249,11 +249,29 @@ export default function OverviewPage() {
     setLoading(true);
     setError(null);
     try {
-      const [evts, pipe, alts, srcs, vol, crit, thru, errs] = await Promise.all([
+      // Sources are always fetched so the configured source list is visible;
+      // their metrics are computed from actual events and will be zero when paused.
+      const srcs = await fetchSources();
+      setSources(srcs.slice(0, 8));
+
+      if (!liveFeedActive) {
+        // When the pipeline is paused, show idle/empty state instead of stale demo data.
+        setEvents([]);
+        setPipeline(null);
+        setAlerts([]);
+        setVolumeData([]);
+        setCriticalData([]);
+        setThroughputData([]);
+        setErrors([]);
+        setLastRefresh(new Date());
+        setLoading(false);
+        return;
+      }
+
+      const [evts, pipe, alts, vol, crit, thru, errs] = await Promise.all([
         getRecentEvents(20),
         getPipelineMetrics(),
         getAnomalyAlerts(),
-        fetchSources(),
         getEventVolume("1h"),
         getCriticalEvents("1h"),
         getThroughput("1h"),
@@ -267,7 +285,6 @@ export default function OverviewPage() {
       });
       setPipeline(pipe);
       setAlerts(alts);
-      setSources(srcs.slice(0, 8));
       setVolumeData(vol.slice(-30).map((p) => p.value));
       setCriticalData(crit.slice(-30).map((p) => p.value));
       setThroughputData(thru);
@@ -278,11 +295,18 @@ export default function OverviewPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [liveFeedActive]);
+
+  // Sync local streaming toggle with the backend state on mount.
+  useEffect(() => {
+    void getStreamState().then((state) => {
+      const streaming = state.is_streaming ?? state.status === "streaming";
+      setLiveFeedActive(streaming);
+    });
+  }, [setLiveFeedActive]);
 
   // Initial data load
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async fetch; state updates happen after await
     void load();
   }, [load]);
 

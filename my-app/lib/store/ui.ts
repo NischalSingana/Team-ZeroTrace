@@ -19,7 +19,7 @@ export const useUIStore = create<UIState>()(
   persist(
     (set) => ({
       sidebarCollapsed: false,
-      liveFeedActive: true,
+      liveFeedActive: false,
       selectedSourceId: null,
       searchQuery: "",
       toggleSidebar: () =>

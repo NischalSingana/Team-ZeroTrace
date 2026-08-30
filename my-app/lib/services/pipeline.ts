@@ -20,3 +20,7 @@ export async function resumeStream(): Promise<void> {
 export async function restartStream(): Promise<void> {
   await fetchJson("/api/pipeline/stream/restart", { method: "POST" });
 }
+
+export async function getStreamState(): Promise<{ is_streaming: boolean; status: string }> {
+  return fetchJson<{ is_streaming: boolean; status: string }>("/api/pipeline/stream/state");
+}

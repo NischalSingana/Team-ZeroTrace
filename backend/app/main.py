@@ -14,32 +14,7 @@ from app.routers import events, sources, parsers, pipeline, health, analytics, a
 from app.services.auth_service import get_current_active_user
 
 
-async def _auto_seed():
-    """Run demo seed in background after startup."""
-    await asyncio.sleep(3)  # Wait for DB to fully settle
-    try:
-        from app.routers.demo import _seed_sources, _seed_parsers, _seed_events
-        from app.services.auth_service import get_password_hash
-        from app.models import User
-        from sqlalchemy.future import select
-        async for db in get_db():
-            result = await db.execute(select(User).where(User.username == "admin"))
-            if not result.scalar_one_or_none():
-                db.add(User(
-                    username="admin",
-                    email="admin@ulpf.local",
-                    hashed_password=get_password_hash("admin"),
-                    is_active=True,
-                    is_superuser=True
-                ))
-                await db.commit()
-            await _seed_sources(db)
-            await _seed_parsers(db)
-            await _seed_events(db, 100)
-            break
-        print("[ULPF] Auto-seed completed successfully.")
-    except Exception as e:
-        print(f"[ULPF] Auto-seed warning: {e}")
+
 
 async def _setup_db():
     """Ensure essential objects (admin, sources, parsers) exist on startup."""
@@ -77,8 +52,10 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
         
     await _setup_db()
-    
-    # Fire-and-forget background stream tasks (non-blocking)
+
+    # Fire-and-forget background stream tasks (non-blocking).
+    # The stream starts in a paused state; the user must enable streaming from
+    # the Pipeline page.
     asyncio.create_task(background_writer())
     asyncio.create_task(background_ingester())
     
