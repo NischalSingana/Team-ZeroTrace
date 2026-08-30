@@ -1,6 +1,6 @@
 """Sources Router"""
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import select, func
+from sqlalchemy import select, func, Integer
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_db
@@ -38,7 +38,7 @@ async def _compute_source_metrics(db, source_id: str):
     quality_stmt = (
         select(
             func.count(Event.id),
-            func.sum(func.cast(Event.parser_confidence >= 0.5, func.integer())),
+            func.sum(func.cast(Event.parser_confidence >= 0.5, Integer)),
         )
         .where(Event.source_id == source_id, Event.timestamp >= last_minute)
     )
@@ -88,8 +88,8 @@ async def list_sources(db=Depends(get_db)):
 
     out = []
     for source in sources:
-        metrics = await _compute_source_metrics(db, source.id)
-        source.metrics = metrics
+        metrics = await _compute_source_metrics(db, str(source.id))
+        source.metrics = metrics  # type: ignore
         out.append(SourceOut.model_validate(source).model_dump())
 
     return ApiResponse(data=out)
@@ -103,7 +103,7 @@ async def get_source(source_id: str, db=Depends(get_db)):
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    source.metrics = await _compute_source_metrics(db, source.id)
+    source.metrics = await _compute_source_metrics(db, str(source.id))  # type: ignore
     return ApiResponse(data=SourceOut.model_validate(source).model_dump())
 
 
@@ -113,7 +113,7 @@ async def create_source(source: SourceCreate, db=Depends(get_db)):
     db.add(db_source)
     await db.commit()
     await db.refresh(db_source)
-    db_source.metrics = await _compute_source_metrics(db, db_source.id)
+    db_source.metrics = await _compute_source_metrics(db, str(db_source.id))  # type: ignore
     return ApiResponse(data=SourceOut.model_validate(db_source).model_dump())
 
 
@@ -130,7 +130,7 @@ async def update_source(source_id: str, update: SourceUpdate, db=Depends(get_db)
 
     await db.commit()
     await db.refresh(source)
-    source.metrics = await _compute_source_metrics(db, source.id)
+    source.metrics = await _compute_source_metrics(db, str(source.id))  # type: ignore
     return ApiResponse(data=SourceOut.model_validate(source).model_dump())
 
 
