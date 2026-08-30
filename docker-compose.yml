@@ -153,7 +153,7 @@ services:
   worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.worker
     command: python -m app.worker
     depends_on:
       postgres:
