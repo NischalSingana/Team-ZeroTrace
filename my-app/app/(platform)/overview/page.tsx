@@ -239,35 +239,44 @@ export default function OverviewPage() {
   const [throughputData, setThroughputData] = useState<ThroughputPoint[]>([]);
   const [errors, setErrors] = useState<ProcessingError[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [apiErrors, setApiErrors] = useState<string[]>([]);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set());
 
   const load = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true);
-    setError(null);
-    try {
-      // Sources are always fetched so the configured source list is visible;
-      // their metrics are computed from actual events and will be zero when paused.
-      const sourcesPromise = fetchSources();
+    setApiErrors([]);
 
-      if (!liveFeedActive) {
-        // When the pipeline is paused, show idle/empty state instead of stale demo data.
+    // Sources are always fetched so the configured source list is visible;
+    // their metrics are computed from actual events and will be zero when paused.
+    const sourcesPromise = fetchSources();
+
+    if (!liveFeedActive) {
+      try {
         const srcs = await sourcesPromise;
         setSources(srcs.slice(0, 8));
-        setEvents([]);
-        setPipeline(null);
-        setAlerts([]);
-        setVolumeData([]);
-        setCriticalData([]);
-        setThroughputData([]);
-        setErrors([]);
-        setLastRefresh(new Date());
-        setLoading(false);
-        return;
+      } catch (err) {
+        setApiErrors((prev) => [
+          ...prev,
+          `Sources failed: ${err instanceof Error ? err.message : String(err)}`,
+        ]);
       }
+      // When the pipeline is paused, clear live data so we don't show stale numbers.
+      setEvents([]);
+      setPipeline(null);
+      setAlerts([]);
+      setVolumeData([]);
+      setCriticalData([]);
+      setThroughputData([]);
+      setErrors([]);
+      setLastRefresh(new Date());
+      setLoading(false);
+      return;
+    }
 
-      const [srcs, evts, pipe, alts, vol, crit, thru, errs] = await Promise.all([
+    // Load every widget independently so one failing endpoint doesn't blank the whole page.
+    const [srcsResult, evtsResult, pipeResult, altsResult, volResult, critResult, thruResult, errsResult] =
+      await Promise.allSettled([
         sourcesPromise,
         getRecentEvents(20),
         getPipelineMetrics(),
@@ -277,33 +286,78 @@ export default function OverviewPage() {
         getThroughput("1h"),
         getProcessingErrors(15),
       ]);
-      setSources(srcs.slice(0, 8));
+
+    const nextErrors: string[] = [];
+
+    if (srcsResult.status === "fulfilled") {
+      setSources(srcsResult.value.slice(0, 8));
+    } else {
+      nextErrors.push(`Sources failed: ${srcsResult.reason instanceof Error ? srcsResult.reason.message : String(srcsResult.reason)}`);
+    }
+
+    if (evtsResult.status === "fulfilled") {
       setEvents((prev) => {
         const prevIds = new Set(prev.map((e) => e.id));
-        const newIds = new Set(evts.filter((e) => !prevIds.has(e.id)).map((e) => e.id));
+        const newIds = new Set(evtsResult.value.filter((e) => !prevIds.has(e.id)).map((e) => e.id));
         if (newIds.size > 0) setNewEventIds(newIds);
-        return evts;
+        return evtsResult.value;
       });
-      setPipeline(pipe);
-      setAlerts(alts);
-      setVolumeData(vol.slice(-30).map((p) => p.value));
-      setCriticalData(crit.slice(-30).map((p) => p.value));
-      setThroughputData(thru);
-      setErrors(errs);
-      setLastRefresh(new Date());
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
-    } finally {
-      setLoading(false);
+    } else {
+      nextErrors.push(`Events failed: ${evtsResult.reason instanceof Error ? evtsResult.reason.message : String(evtsResult.reason)}`);
     }
+
+    if (pipeResult.status === "fulfilled") {
+      setPipeline(pipeResult.value);
+    } else {
+      nextErrors.push(`Pipeline failed: ${pipeResult.reason instanceof Error ? pipeResult.reason.message : String(pipeResult.reason)}`);
+    }
+
+    if (altsResult.status === "fulfilled") {
+      setAlerts(altsResult.value);
+    } else {
+      nextErrors.push(`Alerts failed: ${altsResult.reason instanceof Error ? altsResult.reason.message : String(altsResult.reason)}`);
+    }
+
+    if (volResult.status === "fulfilled") {
+      setVolumeData(volResult.value.slice(-30).map((p) => p.value));
+    } else {
+      nextErrors.push(`Volume failed: ${volResult.reason instanceof Error ? volResult.reason.message : String(volResult.reason)}`);
+    }
+
+    if (critResult.status === "fulfilled") {
+      setCriticalData(critResult.value.slice(-30).map((p) => p.value));
+    } else {
+      nextErrors.push(`Critical events failed: ${critResult.reason instanceof Error ? critResult.reason.message : String(critResult.reason)}`);
+    }
+
+    if (thruResult.status === "fulfilled") {
+      setThroughputData(thruResult.value);
+    } else {
+      nextErrors.push(`Throughput failed: ${thruResult.reason instanceof Error ? thruResult.reason.message : String(thruResult.reason)}`);
+    }
+
+    if (errsResult.status === "fulfilled") {
+      setErrors(errsResult.value);
+    } else {
+      nextErrors.push(`Processing errors failed: ${errsResult.reason instanceof Error ? errsResult.reason.message : String(errsResult.reason)}`);
+    }
+
+    setApiErrors(nextErrors);
+    setLastRefresh(new Date());
+    setLoading(false);
   }, [liveFeedActive]);
 
   // Sync local streaming toggle with the backend state on mount.
   useEffect(() => {
-    void getStreamState().then((state) => {
-      const streaming = state.is_streaming ?? state.status === "streaming";
-      setLiveFeedActive(streaming);
-    });
+    void getStreamState()
+      .then((state) => {
+        const streaming = state.is_streaming ?? state.status === "streaming";
+        setLiveFeedActive(streaming);
+      })
+      .catch((err) => {
+        console.error("Failed to sync stream state:", err);
+        // Keep the existing persisted state so the UI doesn't flip unexpectedly.
+      });
   }, [setLiveFeedActive]);
 
   // Initial data load
@@ -351,15 +405,11 @@ export default function OverviewPage() {
         }
       />
 
-      {error || !liveFeedActive ? (
+      {!liveFeedActive ? (
         <div className="flex-1 overflow-y-auto bg-[#050709] flex flex-col items-center justify-center p-8 min-h-[500px]">
           <EmptyState
             title="Run the pipeline to show the analysis and overview"
-            description={
-              error
-                ? `Cannot load dashboard data (${error.message}). Start the pipeline to retry.`
-                : "The pipeline is currently paused. Start the live feed to see analytics and event throughput."
-            }
+            description="The pipeline is currently paused. Start the live feed to see analytics and event throughput."
             icon={<Activity className="w-12 h-12 text-[#3b82f6]" />}
             action={
               <Button
@@ -383,6 +433,36 @@ export default function OverviewPage() {
         </div>
       ) : (
         <>
+          {/* ── API Error Banner ─────────────────────────────────────── */}
+          {apiErrors.length > 0 && (
+            <div className="bg-[#450a0a]/60 border-b border-[#ef4444]/30 px-4 py-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-[#ef4444] flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-[#fca5a5] text-xs font-medium">
+                    Some dashboard data could not be loaded
+                  </p>
+                  <ul className="mt-1 space-y-0.5">
+                    {apiErrors.slice(0, 3).map((err, i) => (
+                      <li key={i} className="text-[#fca5a5]/80 text-[10px] font-mono truncate">
+                        {err}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => load(true)}
+                  leftIcon={<RefreshCw className="w-3 h-3" />}
+                  className="text-[#fca5a5] hover:text-[#fff] hover:bg-[#ef4444]/20 flex-shrink-0"
+                >
+                  Retry
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* ── System Metric Strip ──────────────────────────────────── */}
           <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-px bg-[#1e2d3d] border-b border-[#1e2d3d]">
             {loading ? (

@@ -1,5 +1,4 @@
 """Pipeline Router"""
-import os
 import random
 import time
 from datetime import datetime, timezone, timedelta
@@ -10,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import Event
 from app.schemas import PipelineMetrics, PipelineStageMetrics, ApiResponse
-from app.services.stream_service import pause_stream, resume_stream, restart_stream, stream_state
+from app.services.stream_service import pause_stream, resume_stream, restart_stream, stream_state, get_kafka_lag
 
 router = APIRouter()
 
@@ -175,14 +174,7 @@ async def _generate_pipeline_metrics(db: AsyncSession) -> PipelineMetrics:
         )
 
     # Kafka lag estimate: events written to stream.log but not yet ingested.
-    lag = 0
-    try:
-        if os.path.exists(stream_state.file_path):
-            with open(stream_state.file_path, "r") as f:
-                f.seek(stream_state.offset)
-                lag = sum(1 for _ in iter(f.readline, ""))
-    except Exception:
-        lag = 0
+    lag = get_kafka_lag()
 
     return PipelineMetrics(
         total_events_per_sec=int(events_per_sec),

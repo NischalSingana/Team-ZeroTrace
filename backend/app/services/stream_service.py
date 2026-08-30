@@ -31,11 +31,22 @@ class StreamState:
         if not os.path.exists(self.file_path):
             with open(self.file_path, "a") as f:
                 pass
-        
+
         # Start at the end of the file to avoid replaying old logs
         self.offset: int = os.path.getsize(self.file_path) if os.path.exists(self.file_path) else 0
 
+        # Track pipeline lag without scanning the whole file on every metrics call.
+        self.lines_written: int = 0
+        self.lines_ingested: int = 0
+
+        self._lock = asyncio.Lock()
+
 stream_state = StreamState()
+
+
+def get_kafka_lag() -> int:
+    """Return the estimated number of events waiting to be ingested."""
+    return max(0, stream_state.lines_written - stream_state.lines_ingested)
 
 
 def _make_event_id():
@@ -307,6 +318,13 @@ def generate_log_line() -> Dict[str, Any]:
 # Background tasks
 # ═══════════════════════════════════════════════════════════════════
 
+def _write_log_batch(file_path: str, lines: list[str]) -> int:
+    """Synchronous helper: append a batch of lines and return bytes written."""
+    with open(file_path, "a") as f:
+        f.writelines(lines)
+    return sum(len(line.encode("utf-8")) for line in lines)
+
+
 async def background_writer():
     """Continuously writes new log lines to the stream.log file while streaming."""
     while True:
@@ -314,16 +332,17 @@ async def background_writer():
             if not stream_state.is_streaming:
                 await asyncio.sleep(1)
                 continue
-            
+
             # Generate a realistic batch of events
             batch_size = random.randint(30, 80)
-            lines = []
-            for _ in range(batch_size):
-                log_entry = generate_log_line()
-                lines.append(json.dumps(log_entry) + "\n")
-                
-            with open(stream_state.file_path, "a") as f:
-                f.writelines(lines)
+            lines = [json.dumps(generate_log_line()) + "\n" for _ in range(batch_size)]
+
+            # Run blocking file I/O in a thread so the event loop stays responsive.
+            bytes_written = await asyncio.to_thread(_write_log_batch, stream_state.file_path, lines)
+
+            async with stream_state._lock:
+                stream_state.offset += bytes_written
+                stream_state.lines_written += len(lines)
         except Exception as e:
             print(f"[Writer] Error writing log: {e}")
         await asyncio.sleep(1.0)
@@ -355,114 +374,163 @@ def _build_lineage(ts: datetime, processed_at: datetime, parser_id: str) -> list
     return lineage
 
 
-async def process_log_line(line: str):
-    """Parses a log line and inserts it into the database as an Event."""
-    try:
-        data = json.loads(line)
-        # Parse datetime fields
-        for field in ["timestamp", "ingested_at", "processed_at"]:
-            if field in data and data[field]:
-                data[field] = datetime.fromisoformat(data[field])
+def _parse_event_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Normalize raw JSON event data into model-ready kwargs."""
+    for field in ["timestamp", "ingested_at", "processed_at"]:
+        if field in data and data[field]:
+            data[field] = datetime.fromisoformat(data[field])
 
-        lineage = _build_lineage(
-            data["timestamp"], data["processed_at"], data.get("parser_id", "unknown")
-        )
+    lineage = _build_lineage(
+        data["timestamp"], data["processed_at"], data.get("parser_id", "unknown")
+    )
 
-        async with AsyncSessionLocal() as session:
-            db_event = Event(
-                id=data["id"],
-                timestamp=data["timestamp"],
-                ingested_at=data["ingested_at"],
-                processed_at=data["processed_at"],
-                source_id=data["source_id"],
-                source_name=data["source_name"],
-                source_type=data["source_type"],
-                severity=data["severity"],
-                category=data["category"],
-                action=data["action"],
-                outcome=data["outcome"],
-                actor=data["actor"],
-                target=data["target"],
-                tags=data["tags"],
-                raw_ref=data["raw_ref"],
-                raw_preview=data["raw_preview"],
-                raw_format=data["raw_format"],
-                parser_id=data["parser_id"],
-                parser_version=data["parser_version"],
-                parser_confidence=data["parser_confidence"],
-                schema_coverage=data["schema_coverage"],
-                lineage=lineage,
-                downstream=[
-                    {"system": "opensearch", "reference": f"ulpf-events/{data['id']}", "delivered_at": data["processed_at"].isoformat()},
-                ],
-                extra_fields={},
-            )
-            session.add(db_event)
+    return {
+        "id": data["id"],
+        "timestamp": data["timestamp"],
+        "ingested_at": data["ingested_at"],
+        "processed_at": data["processed_at"],
+        "source_id": data["source_id"],
+        "source_name": data["source_name"],
+        "source_type": data["source_type"],
+        "severity": data["severity"],
+        "category": data["category"],
+        "action": data["action"],
+        "outcome": data["outcome"],
+        "actor": data["actor"],
+        "target": data["target"],
+        "tags": data["tags"],
+        "raw_ref": data["raw_ref"],
+        "raw_preview": data["raw_preview"],
+        "raw_format": data["raw_format"],
+        "parser_id": data["parser_id"],
+        "parser_version": data["parser_version"],
+        "parser_confidence": data["parser_confidence"],
+        "schema_coverage": data["schema_coverage"],
+        "lineage": lineage,
+        "downstream": [
+            {"system": "opensearch", "reference": f"ulpf-events/{data['id']}", "delivered_at": data["processed_at"].isoformat()},
+        ],
+        "extra_fields": {},
+    }
 
-            # Generate anomaly alerts for high/critical security events.
+
+def _build_alert_for_event(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Build an anomaly alert dict for high/critical events."""
+    alert_type = "rule_trigger"
+    title = f"Suspicious activity on {data['source_name']}"
+    description = f"{data['action']} detected from {data['actor'].get('ip', 'unknown')}"
+
+    if data["category"] == "authentication":
+        alert_type = "brute_force"
+        title = f"Brute-force attempt against {data['source_name']}"
+        description = f"Repeated failed logins for {data['actor'].get('user', 'unknown')} from {data['actor'].get('ip', 'unknown')}"
+    elif data["category"] == "threat_detection":
+        alert_type = "rule_trigger"
+        title = f"Threat blocked by {data['source_name']}"
+        description = f"Malicious traffic detected from {data['actor'].get('ip', 'unknown')}"
+    elif data["category"] == "authorization":
+        alert_type = "privilege_escalation"
+        title = f"Privilege escalation on {data['source_name']}"
+        description = f"Sensitive IAM/policy change by {data['actor'].get('user', 'unknown')} from {data['actor'].get('ip', 'unknown')}"
+    elif data["category"] == "network_connection":
+        alert_type = "exfiltration"
+        title = f"Potential data exfiltration via {data['source_name']}"
+        description = f"Large outbound connection to {data['target'].get('ip', 'unknown')}"
+
+    return {
+        "id": f"alert_{uuid.uuid4().hex[:8]}",
+        "alert_type": alert_type,
+        "severity": data["severity"],
+        "source_id": data["source_id"],
+        "source_name": data["source_name"],
+        "title": title,
+        "description": description,
+        "score": round(random.uniform(0.75, 0.99), 2),
+        "event_count": random.randint(5, 50),
+        "sample_event_id": data["id"],
+    }
+
+
+async def _ingest_batch(lines: list[str]) -> int:
+    """Parse and persist a batch of log lines in a single transaction."""
+    events_data: list[Dict[str, Any]] = []
+    alerts_data: list[Dict[str, Any]] = []
+
+    for line in lines:
+        try:
+            data = json.loads(line)
+            events_data.append(_parse_event_data(data))
             if data["severity"] in ["high", "critical"]:
-                alert_type = "rule_trigger"
-                title = f"Suspicious activity on {data['source_name']}"
-                description = f"{data['action']} detected from {data['actor'].get('ip', 'unknown')}"
-                if data["category"] == "authentication":
-                    alert_type = "brute_force"
-                    title = f"Brute-force attempt against {data['source_name']}"
-                    description = f"Repeated failed logins for {data['actor'].get('user', 'unknown')} from {data['actor'].get('ip', 'unknown')}"
-                elif data["category"] == "threat_detection":
-                    alert_type = "rule_trigger"
-                    title = f"Threat blocked by {data['source_name']}"
-                    description = f"Malicious traffic detected from {data['actor'].get('ip', 'unknown')}"
-                elif data["category"] == "authorization":
-                    alert_type = "privilege_escalation"
-                    title = f"Privilege escalation on {data['source_name']}"
-                    description = f"Sensitive IAM/policy change by {data['actor'].get('user', 'unknown')} from {data['actor'].get('ip', 'unknown')}"
-                elif data["category"] == "network_connection":
-                    alert_type = "exfiltration"
-                    title = f"Potential data exfiltration via {data['source_name']}"
-                    description = f"Large outbound connection to {data['target'].get('ip', 'unknown')}"
+                alerts_data.append(_build_alert_for_event(data))
+        except Exception as e:
+            print(f"[Ingester] Error parsing line: {e}")
 
-                alert = AnomalyAlert(
-                    id=f"alert_{uuid.uuid4().hex[:8]}",
-                    alert_type=alert_type,
-                    severity=data["severity"],
-                    source_id=data["source_id"],
-                    source_name=data["source_name"],
-                    title=title,
-                    description=description,
-                    score=round(random.uniform(0.75, 0.99), 2),
-                    event_count=random.randint(5, 50),
-                    sample_event_id=db_event.id,
-                )
-                session.add(alert)
+    if not events_data:
+        return 0
 
+    async with AsyncSessionLocal() as session:
+        try:
+            for event_kwargs in events_data:
+                session.add(Event(**event_kwargs))
+            for alert_kwargs in alerts_data:
+                session.add(AnomalyAlert(**alert_kwargs))
             await session.commit()
+            return len(events_data)
+        except Exception as e:
+            await session.rollback()
+            print(f"[Ingester] Error committing batch: {e}")
+            return 0
+
+
+def _read_batch(file_path: str, offset: int, max_lines: int) -> tuple[list[str], int]:
+    """Synchronous helper: read up to max_lines from file at offset.
+
+    Returns (lines, new_offset).
+    """
+    lines: list[str] = []
+    try:
+        with open(file_path, "r") as f:
+            f.seek(offset)
+            for _ in range(max_lines):
+                line = f.readline()
+                if not line:
+                    break
+                lines.append(line)
+            return lines, f.tell()
     except Exception as e:
-        print(f"[Ingester] Error processing line: {e}")
+        print(f"[Ingester] Error reading batch: {e}")
+        return [], offset
 
 
 async def background_ingester():
-    """Reads from stream.log at the current offset when streaming is active."""
+    """Reads from stream.log in batches and ingests events while streaming."""
     while True:
         if not stream_state.is_streaming:
             await asyncio.sleep(1)
             continue
 
         try:
-            with open(stream_state.file_path, "r") as f:
-                f.seek(stream_state.offset)
-                line = f.readline()
+            # Read a batch of lines without blocking the event loop.
+            lines, new_offset = await asyncio.to_thread(
+                _read_batch, stream_state.file_path, stream_state.offset, 100
+            )
 
-                if not line:
-                    # EOF reached, wait for more data
-                    await asyncio.sleep(1)
-                    continue
+            if not lines:
+                await asyncio.sleep(0.5)
+                continue
 
-                # We have a line, update offset and process it
-                stream_state.offset = f.tell()
-                await process_log_line(line)
+            # Persist the batch and only advance the offset on success.
+            ingested = await _ingest_batch(lines)
+            if ingested > 0:
+                async with stream_state._lock:
+                    stream_state.offset = new_offset
+                    stream_state.lines_ingested += ingested
+            else:
+                # If nothing was ingested, avoid tight retry loops.
+                await asyncio.sleep(1)
 
         except Exception as e:
-            print(f"[Ingester] Error reading file: {e}")
+            print(f"[Ingester] Error in ingester loop: {e}")
             await asyncio.sleep(2)
 
 
@@ -480,12 +548,21 @@ async def resume_stream():
     return {"status": "streaming", "is_streaming": True}
 
 
+def _clear_stream_file(file_path: str):
+    """Synchronous helper to truncate the stream file."""
+    open(file_path, "w").close()
+
+
 async def restart_stream():
     stream_state.is_streaming = False
 
-    # Clear the file
-    open(stream_state.file_path, "w").close()
-    stream_state.offset = 0
+    # Clear the file in a thread to avoid blocking the event loop.
+    await asyncio.to_thread(_clear_stream_file, stream_state.file_path)
+
+    async with stream_state._lock:
+        stream_state.offset = 0
+        stream_state.lines_written = 0
+        stream_state.lines_ingested = 0
 
     # Clear streamed data from the database
     try:
