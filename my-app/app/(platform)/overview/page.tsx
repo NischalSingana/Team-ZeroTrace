@@ -357,14 +357,34 @@ export default function OverviewPage() {
         }
       />
 
-      {error ? (
-        <div className="flex-1 overflow-y-auto bg-[#050709]">
-          <BackendErrorState
-            error={error}
-            onRetry={load}
-            title={errorTitle}
-            description={errorDescription}
-            className="h-full"
+      {error || !liveFeedActive ? (
+        <div className="flex-1 overflow-y-auto bg-[#050709] flex flex-col items-center justify-center p-8 min-h-[500px]">
+          <EmptyState
+            title="Run the pipeline to show the analysis and overview"
+            description={
+              error
+                ? `Cannot load dashboard data (${error.message}). Start the pipeline to retry.`
+                : "The pipeline is currently paused. Start the live feed to see analytics and event throughput."
+            }
+            icon={<Activity className="w-12 h-12 text-[#3b82f6]" />}
+            action={
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await import("@/lib/services/pipeline").then((m) => m.resumeStream());
+                  } catch (e) {
+                    console.error("Failed to start pipeline:", e);
+                  }
+                  setLiveFeedActive(true);
+                  void load();
+                }}
+                rightIcon={<Zap className="w-3.5 h-3.5" />}
+              >
+                Start Pipeline
+              </Button>
+            }
           />
         </div>
       ) : (

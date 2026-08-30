@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Bell, Search, Wifi, WifiOff, LogOut } from "lucide-react";
 import { useUIStore } from "@/lib/store/ui";
 import { Button } from "@/components/ui/button";
+import { pauseStream, resumeStream } from "@/lib/services/pipeline";
 import { StatusDot } from "@/components/ui/status-dot";
 import { cn } from "@/lib/utils/cn";
 import { useState, useRef, useEffect } from "react";
@@ -44,6 +45,19 @@ export function Topbar({ alertCount = 5 }: TopbarProps) {
     if (searchValue.trim()) {
       router.push(`/explorer?q=${encodeURIComponent(searchValue.trim())}`);
     }
+  };
+
+  const handleToggleFeed = async () => {
+    try {
+      if (liveFeedActive) {
+        await pauseStream();
+      } else {
+        await resumeStream();
+      }
+    } catch (err) {
+      console.error("Failed to toggle stream:", err);
+    }
+    toggleLiveFeed();
   };
 
   return (
@@ -107,7 +121,7 @@ export function Topbar({ alertCount = 5 }: TopbarProps) {
       <Button
         variant="ghost"
         size="sm"
-        onClick={toggleLiveFeed}
+        onClick={handleToggleFeed}
         className={cn(
           "gap-1.5 h-7 text-[10px] font-mono",
           liveFeedActive
