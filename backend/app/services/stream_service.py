@@ -26,13 +26,14 @@ class StreamState:
     def __init__(self):
         self.is_streaming: bool = False
         self.file_path: str = "data/stream.log"
-        self.offset: int = 0
         os.makedirs("data", exist_ok=True)
         # Ensure file exists
         if not os.path.exists(self.file_path):
             with open(self.file_path, "a") as f:
                 pass
-
+        
+        # Start at the end of the file to avoid replaying old logs
+        self.offset: int = os.path.getsize(self.file_path) if os.path.exists(self.file_path) else 0
 
 stream_state = StreamState()
 
@@ -312,12 +313,19 @@ async def background_writer():
             if not stream_state.is_streaming:
                 await asyncio.sleep(1)
                 continue
-            log_entry = generate_log_line()
+            
+            # Generate a realistic batch of events
+            batch_size = random.randint(30, 80)
+            lines = []
+            for _ in range(batch_size):
+                log_entry = generate_log_line()
+                lines.append(json.dumps(log_entry) + "\n")
+                
             with open(stream_state.file_path, "a") as f:
-                f.write(json.dumps(log_entry) + "\n")
+                f.writelines(lines)
         except Exception as e:
             print(f"[Writer] Error writing log: {e}")
-        await asyncio.sleep(random.uniform(0.5, 2.0))
+        await asyncio.sleep(1.0)
 
 
 def _build_lineage(ts: datetime, processed_at: datetime, parser_id: str) -> list:
