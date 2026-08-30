@@ -339,7 +339,7 @@ def _build_lineage(ts: datetime, processed_at: datetime, parser_id: str) -> list
         ("normalization", 1.8, "Normalized"),
         ("schema_validation", 0.6, "Validated"),
         ("enrichment", 4.2, "Enriched with threat intel"),
-        ("storage", 4.1, "Stored"),
+        ("output", 4.1, "Output to downstream systems"),
     ]
     lineage = []
     cursor = ts

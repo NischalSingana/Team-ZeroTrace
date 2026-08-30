@@ -163,6 +163,7 @@ export interface LineageStep {
     | "normalization"
     | "schema_validation"
     | "enrichment"
+    | "output"
     | "storage";
   status: "success" | "warning" | "error" | "skipped";
   duration_ms: number;

@@ -112,7 +112,12 @@ async def _generate_pipeline_metrics(db: AsyncSession) -> PipelineMetrics:
         return idle
 
     total_in_window = len(window_events)
-    events_per_sec = round(total_in_window / 60.0, 1)
+    window_timestamps = [e.timestamp for e in window_events if e.timestamp]
+    window_span = max(
+        (max(window_timestamps) - min(window_timestamps)).total_seconds(),
+        1.0,
+    ) if window_timestamps else 60.0
+    events_per_sec = round(total_in_window / window_span, 1)
 
     # Aggregate stats
     confidences = [e.parser_confidence or 0 for e in window_events]
@@ -148,7 +153,7 @@ async def _generate_pipeline_metrics(db: AsyncSession) -> PipelineMetrics:
     for stage in STAGE_ORDER:
         stats = stage_stats[stage]
         count = stats["count"]
-        eps = round(count / 60.0, 1) if count else 0
+        eps = round(count / window_span, 1) if count else 0
         durations = stats["durations"]
         avg_latency = round(sum(durations) / len(durations), 1) if durations else 0.0
         sorted_durations = sorted(durations)
