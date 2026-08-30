@@ -1,9 +1,9 @@
 """Analytics Router"""
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Query, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, select, desc
+from sqlalchemy import func, select, desc, Integer
 
 from app.database import get_db
 from app.models import Event
@@ -15,7 +15,7 @@ from app.schemas import (
 router = APIRouter()
 
 def _get_time_delta_and_trunc(range_str: str):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     if range_str == "1h":
         return now - timedelta(hours=1), "minute", 60
     elif range_str == "6h":
@@ -41,7 +41,7 @@ async def event_volume(
         select(
             func.date_trunc(trunc_level, Event.timestamp).label("ts"),
             Event.severity,
-            func.count(Event.id).label("count")
+            func.count(Event.id).label("c")
         )
         .where(Event.timestamp >= start_time)
         .group_by("ts", Event.severity)
@@ -60,8 +60,8 @@ async def event_volume(
             grouped[ts_str] = {"time": ts_str, "value": 0, "critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0, "unknown": 0}
         
         sev = row.severity if row.severity in grouped[ts_str] else "unknown"
-        grouped[ts_str][sev] = row.count
-        grouped[ts_str]["value"] += row.count
+        grouped[ts_str][sev] = row.c
+        grouped[ts_str]["value"] += row.c
         
     data = [EventVolumePoint(**g) for g in grouped.values()]
     return ApiResponse(data=[d.model_dump() for d in data])
@@ -77,7 +77,7 @@ async def critical_events(
     stmt = (
         select(
             func.date_trunc(trunc_level, Event.timestamp).label("ts"),
-            func.count(Event.id).label("count")
+            func.count(Event.id).label("c")
         )
         .where(Event.timestamp >= start_time, Event.severity == 'critical')
         .group_by("ts")
@@ -86,7 +86,7 @@ async def critical_events(
     
     result = await db.execute(stmt)
     data = [
-        TimeSeriesPoint(timestamp=row.ts.isoformat(), value=row.count)
+        TimeSeriesPoint(timestamp=row.ts.isoformat(), value=row.c)
         for row in result.all() if row.ts
     ]
     return ApiResponse(data=[d.model_dump() for d in data])
@@ -105,7 +105,7 @@ async def error_rate(
             func.date_trunc(trunc_level, Event.timestamp).label("ts"),
             func.count(Event.id).label("total"),
             func.sum(
-                func.cast(Event.parser_confidence < 0.5, func.integer())
+                func.cast(Event.parser_confidence < 0.5, Integer)
             ).label("errors")
         )
         .where(Event.timestamp >= start_time)
@@ -135,7 +135,7 @@ async def parse_success(
         select(
             func.date_trunc(trunc_level, Event.timestamp).label("ts"),
             func.sum(
-                func.cast(Event.parser_confidence >= 0.5, func.integer())
+                func.cast(Event.parser_confidence >= 0.5, Integer)
             ).label("successes")
         )
         .where(Event.timestamp >= start_time)
@@ -191,7 +191,7 @@ async def severity_breakdown(db: AsyncSession = Depends(get_db)):
         select(Event.severity, func.count(Event.id))
         .group_by(Event.severity)
     )
-    counts = dict(result.all())
+    counts = {row[0]: row[1] for row in result.all()}
     
     return ApiResponse(data=SeverityBreakdown(
         critical=counts.get("critical", 0),
@@ -250,11 +250,11 @@ async def processing_errors(
         errors.append(ProcessingError(
             id=f"err_{e.id}",
             timestamp=e.timestamp.isoformat(),
-            source_id=e.source_id,
-            parser_id=e.parser_id,
+            source_id=str(e.source_id),
+            parser_id=str(e.parser_id) if e.parser_id else None,
             stage="parser_match",
             error="Low confidence parsing result",
-            raw_preview=e.raw_preview or "Unknown raw data",
+            raw_preview=str(e.raw_preview) if e.raw_preview else "Unknown raw data",
         ))
         
     return ApiResponse(data=[e.model_dump() for e in errors])

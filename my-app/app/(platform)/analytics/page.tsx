@@ -24,7 +24,7 @@ import {
   getTopSources,
   getEventVolume,
 } from "@/lib/services/analytics";
-import type { ThroughputPoint, SeverityBreakdown, SourceTopEntry, TimeSeriesPoint, EventVolumePoint } from "@/lib/types";
+import type { ThroughputPoint, SeverityBreakdown, SourceTopEntry, EventVolumePoint } from "@/lib/types";
 
 interface AnalyticsData {
   throughput: ThroughputPoint[];
