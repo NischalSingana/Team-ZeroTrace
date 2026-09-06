@@ -1,9 +1,9 @@
 #!/bin/bash
 
-echo "📊 Team-ZeroTrace Status"
-echo "-------------------------"
+# Ensure we are in the project root
+cd "$(dirname "$0")/.."
 
-cd ..
+echo "📊 Team-ZeroTrace Status"
 
 echo "🐳 Docker Containers:"
 docker compose ps

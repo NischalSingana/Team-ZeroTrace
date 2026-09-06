@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Ensure we are in the project root
+cd "$(dirname "$0")/.."
+
 echo "🚀 Deploying Team-ZeroTrace..."
 
 # Check if .env exists
