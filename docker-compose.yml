@@ -10,8 +10,10 @@ services:
       POSTGRES_DB: ulpf
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    # ports:
-    #   - "5432:5432"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ulpf -d ulpf"]
       interval: 5s
@@ -24,8 +26,10 @@ services:
     image: redis:7-alpine
     volumes:
       - redis_data:/data
-    # ports:
-    #   - "6379:6379"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -42,9 +46,10 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
       - minio_data:/data
-    # ports:
-    #   - "9000:9000"
-    #   - "9001:9001"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
       test: ["CMD", "mc", "ready", "local"]
       interval: 5s
@@ -66,8 +71,10 @@ services:
         hard: -1
     volumes:
       - opensearch_data:/usr/share/opensearch/data
-    # ports:
-    #   - "9200:9200"
+    deploy:
+      resources:
+        limits:
+          memory: 1.2G
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
       interval: 10s
@@ -81,6 +88,10 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     restart: unless-stopped
 
   kafka:
@@ -96,6 +107,10 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
 
   kafka-init:
@@ -140,8 +155,10 @@ services:
       AI_ENABLED: ${AI_ENABLED:-true}
       DEMO_MODE: ${DEMO_MODE:-true}
       SECRET_KEY: ${SECRET_KEY:-ulpf-change-me-in-production}
-    ports:
-      - "8000:8000"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
@@ -164,6 +181,10 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://ulpf:ulpf@postgres:5432/ulpf}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     restart: unless-stopped
 
   # ── ULPF Frontend ──────────────────────────────────────────────
@@ -176,8 +197,10 @@ services:
     environment:
       NEXT_PUBLIC_API_URL: ""
       BACKEND_URL: http://backend:8000
-    # ports:
-    #   - "3000:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     restart: unless-stopped
 
   # ── Nginx Reverse Proxy ────────────────────────────────────────
@@ -188,11 +211,26 @@ services:
     depends_on:
       - frontend
       - backend
-    # volumes:
-    #   - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
     ports:
       - "80:80"
+      - "443:443"
+    deploy:
+      resources:
+        limits:
+          memory: 64M
     restart: unless-stopped
+
+  # ── Certbot (Let's Encrypt) ────────────────────────────────────
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    command: certonly --webroot -w /var/www/certbot --force-renewal --email your_email@example.com -d example.com -d www.example.com
 
 volumes:
   postgres_data:
