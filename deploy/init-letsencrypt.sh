@@ -5,10 +5,10 @@ if ! [ -x "$(command -v docker-compose)" ] && ! docker compose version > /dev/nu
   exit 1
 fi
 
-domains=(example.com www.example.com) # REPLACE WITH YOUR DOMAIN
+domains=(zerotrace.nischalsingana.com) 
 rsa_key_size=4096
 data_path="../certbot"
-email="your_email@example.com" # REPLACE WITH YOUR EMAIL
+email="admin@nischalsingana.com" # Replace if you want Let's Encrypt renewal notices
 staging=0 # Set to 1 if you're testing your setup to avoid hitting request limits
 
 if [ -d "$data_path" ]; then
