@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { StatusDot } from "@/components/ui/status-dot";
 import { Button } from "@/components/ui/button";
 import { SkeletonBlock } from "@/components/ui/skeleton";
 import { Timestamp } from "@/components/ui/timestamp";
+import { BackendErrorState } from "@/components/ui/error-fallback";
 import { fetchSources } from "@/lib/services/sources";
+import { isOfflineError } from "@/lib/services/api";
 import { formatNumber, formatPercent } from "@/lib/utils/format";
 import type { LogSource } from "@/lib/types";
 import { Plus } from "lucide-react";
@@ -15,10 +17,24 @@ import { Plus } from "lucide-react";
 export default function SourcesPage() {
   const [sources, setSources] = useState<LogSource[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const srcs = await fetchSources();
+      setSources(srcs);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    fetchSources().then((s) => { setSources(s); setLoading(false); });
-  }, []);
+    void load();
+  }, [load]);
 
   const active = sources.filter((s) => s.status === "active").length;
   const errors = sources.filter((s) => s.status === "error").length;
@@ -60,6 +76,17 @@ export default function SourcesPage() {
 
         {loading ? (
           <SkeletonBlock rows={12} />
+        ) : error ? (
+          <BackendErrorState
+            error={error}
+            onRetry={load}
+            title={isOfflineError(error) ? "Backend is offline" : "Failed to load sources"}
+            description={
+              isOfflineError(error)
+                ? "Could not reach the ZeroTrace API. Start the backend service and try again."
+                : "Could not load log sources. Check the backend status and retry."
+            }
+          />
         ) : (
           sources.map((src) => (
             <Link

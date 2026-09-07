@@ -275,12 +275,12 @@ export type AnomalyType =
 
 export interface AnomalyAlert {
   id: string;
-  type: AnomalyType;
+  alert_type: AnomalyType;
   severity: Severity;
-  source_id: string;
-  source_name: string;
+  source_id: string | null;
+  source_name: string | null;
   title: string;
-  description: string;
+  description: string | null;
   score: number; // 0-1 anomaly score
   detected_at: string;
   resolved_at?: string;

@@ -15,7 +15,7 @@ import { MetricLabel } from "@/components/ui/tooltip";
 import { BackendErrorState } from "@/components/ui/error-fallback";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton, SkeletonBlock } from "@/components/ui/skeleton";
-import { getApiErrorMessage, isOfflineError } from "@/lib/services/api";
+import { isOfflineError } from "@/lib/services/api";
 
 type SuggestionStatus = "pending" | "approved" | "rejected";
 
@@ -56,15 +56,7 @@ export default function AIMappingPage() {
       );
       setAnalysisComplete(true);
     } catch (err) {
-      const message = getApiErrorMessage(err);
-      const offline = isOfflineError(err);
-      setAnalysisError(
-        new Error(
-          offline
-            ? "Could not reach the AI service. Make sure the backend is running and try again."
-            : message || "Analysis failed"
-        )
-      );
+      setAnalysisError(err instanceof Error ? err : new Error(String(err)));
     } finally {
       setIsAnalyzing(false);
     }
@@ -91,15 +83,7 @@ export default function AIMappingPage() {
       setIsGenerating(false);
       setIsGenerated(true);
     } catch (err) {
-      const message = getApiErrorMessage(err);
-      const offline = isOfflineError(err);
-      setAnalysisError(
-        new Error(
-          offline
-            ? "Could not reach the backend to generate the parser. Please start the backend and retry."
-            : message || "Parser generation failed"
-        )
-      );
+      setAnalysisError(err instanceof Error ? err : new Error(String(err)));
       setIsGenerating(false);
     }
   };

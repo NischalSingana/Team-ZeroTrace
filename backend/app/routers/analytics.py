@@ -31,7 +31,7 @@ def _get_time_delta_and_trunc(range_str: str):
 
 @router.get("/event-volume")
 async def event_volume(
-    range: str = Query("1h", regex="^(1h|6h|24h|7d|30d)$"),
+    range: str = Query("1h", pattern="^(1h|6h|24h|7d|30d)$"),
     db: AsyncSession = Depends(get_db)
 ):
     start_time, trunc_level, _ = _get_time_delta_and_trunc(range)
@@ -69,7 +69,7 @@ async def event_volume(
 
 @router.get("/critical-events")
 async def critical_events(
-    range: str = Query("1h", regex="^(1h|6h|24h|7d|30d)$"),
+    range: str = Query("1h", pattern="^(1h|6h|24h|7d|30d)$"),
     db: AsyncSession = Depends(get_db)
 ):
     start_time, trunc_level, _ = _get_time_delta_and_trunc(range)
@@ -94,7 +94,7 @@ async def critical_events(
 
 @router.get("/error-rate")
 async def error_rate(
-    range: str = Query("1h", regex="^(1h|6h|24h|7d|30d)$"),
+    range: str = Query("1h", pattern="^(1h|6h|24h|7d|30d)$"),
     db: AsyncSession = Depends(get_db)
 ):
     start_time, trunc_level, _ = _get_time_delta_and_trunc(range)
@@ -125,7 +125,7 @@ async def error_rate(
 
 @router.get("/parse-success")
 async def parse_success(
-    range: str = Query("1h", regex="^(1h|6h|24h|7d|30d)$"),
+    range: str = Query("1h", pattern="^(1h|6h|24h|7d|30d)$"),
     db: AsyncSession = Depends(get_db)
 ):
     start_time, trunc_level, _ = _get_time_delta_and_trunc(range)
@@ -153,7 +153,7 @@ async def parse_success(
 
 @router.get("/throughput")
 async def throughput(
-    time_range: str = Query("1h", alias="range", regex="^(1h|6h|24h|7d|30d)$"),
+    time_range: str = Query("1h", alias="range", pattern="^(1h|6h|24h|7d|30d)$"),
     db: AsyncSession = Depends(get_db)
 ):
     start_time, trunc_level, _ = _get_time_delta_and_trunc(time_range)

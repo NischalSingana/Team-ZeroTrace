@@ -61,7 +61,14 @@ export default function DemoConsolePage() {
       />
 
       {seedResult && (
-        <div className="px-6 py-2 bg-[#052e16]/20 border-b border-[#22c55e]/20 text-[#4ade80] text-xs font-mono">
+        <div
+          className={cn(
+            "px-6 py-2 border-b text-xs font-mono",
+            seedResult.startsWith("Error:")
+              ? "bg-[#450a0a]/30 border-[#ef4444]/20 text-[#fca5a5]"
+              : "bg-[#052e16]/20 border-[#22c55e]/20 text-[#4ade80]"
+          )}
+        >
           {seedResult}
         </div>
       )}

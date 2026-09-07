@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { MetricCard } from "@/components/ui/metric-card";
 import { SeverityBadge } from "@/components/ui/badge";
@@ -242,6 +242,7 @@ export default function OverviewPage() {
   const [apiErrors, setApiErrors] = useState<string[]>([]);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [newEventIds, setNewEventIds] = useState<Set<string>>(new Set());
+  const eventsRef = useRef<NormalizedEvent[]>([]);
 
   const load = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true);
@@ -262,6 +263,7 @@ export default function OverviewPage() {
         ]);
       }
       // When the pipeline is paused, clear live data so we don't show stale numbers.
+      eventsRef.current = [];
       setEvents([]);
       setPipeline(null);
       setAlerts([]);
@@ -296,12 +298,14 @@ export default function OverviewPage() {
     }
 
     if (evtsResult.status === "fulfilled") {
-      setEvents((prev) => {
-        const prevIds = new Set(prev.map((e) => e.id));
-        const newIds = new Set(evtsResult.value.filter((e) => !prevIds.has(e.id)).map((e) => e.id));
-        if (newIds.size > 0) setNewEventIds(newIds);
-        return evtsResult.value;
-      });
+      const nextEvents = evtsResult.value;
+      const prevIds = new Set(eventsRef.current.map((e) => e.id));
+      const newIds = new Set(
+        nextEvents.filter((e) => !prevIds.has(e.id)).map((e) => e.id)
+      );
+      if (newIds.size > 0) setNewEventIds(newIds);
+      eventsRef.current = nextEvents;
+      setEvents(nextEvents);
     } else {
       nextErrors.push(`Events failed: ${evtsResult.reason instanceof Error ? evtsResult.reason.message : String(evtsResult.reason)}`);
     }

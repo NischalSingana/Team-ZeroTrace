@@ -35,7 +35,7 @@ export default function LoginPage() {
       const data = await res.json();
       setToken(data.access_token);
       setUser({ username });
-      // Set cookie for Next.js middleware
+      // Set cookie for route protection in proxy.ts
       document.cookie = `ulpf-auth-token=${data.access_token}; path=/; max-age=604800; samesite=strict`;
       router.push('/overview');
     } catch (err: unknown) {

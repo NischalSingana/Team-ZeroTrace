@@ -9,6 +9,8 @@ import { useUIStore } from "@/lib/store/ui";
 import { useInterval } from "@/lib/utils/hooks";
 import type { PipelineMetrics, NormalizedEvent } from "@/lib/types";
 import { RefreshCw, Pause, Play, Settings2 } from "lucide-react";
+import { toast } from "sonner";
+import { getApiErrorMessage } from "@/lib/services/api";
 import { PipelineCanvas, LiveStream, EventInspector } from "./components";
 
 // ════════════════════════════════════════════════════════════════
@@ -50,21 +52,41 @@ export default function PipelinePage() {
     setSelectedEventId(evt.id);
     if (liveFeedActive) {
       toggleLiveFeed(); // Update local state
-      void pauseStream(); // Also pause backend
+      pauseStream().catch((err) => {
+        console.error("Failed to pause stream:", err);
+        toast.error("Failed to pause stream", {
+          description: getApiErrorMessage(err),
+        });
+      });
     }
   };
 
   const handleToggleFeed = async () => {
-    if (liveFeedActive) {
-      await pauseStream();
-    } else {
-      await resumeStream();
+    try {
+      if (liveFeedActive) {
+        await pauseStream();
+      } else {
+        await resumeStream();
+      }
+      toggleLiveFeed();
+    } catch (err) {
+      console.error("Failed to toggle stream:", err);
+      toast.error("Failed to update stream state", {
+        description: getApiErrorMessage(err),
+      });
     }
-    toggleLiveFeed();
   };
 
   const handleRestart = async () => {
-    await restartStream();
+    try {
+      await restartStream();
+    } catch (err) {
+      console.error("Failed to restart stream:", err);
+      toast.error("Failed to restart stream", {
+        description: getApiErrorMessage(err),
+      });
+      return;
+    }
     setEvents([]);
     if (!liveFeedActive) {
        toggleLiveFeed();

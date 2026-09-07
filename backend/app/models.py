@@ -56,7 +56,7 @@ class Parser(Base):
 class Event(Base):
     __tablename__ = "events"
     
-    id = Column(String, primary_key=True)
+    id = Column(String, primary_key=True, default=lambda: f"evt_{uuid.uuid4().hex[:8]}")
     timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
     ingested_at = Column(DateTime(timezone=True), default=utc_now, index=True)
     processed_at = Column(DateTime(timezone=True), default=utc_now)
@@ -88,7 +88,7 @@ class Event(Base):
 class RawEvent(Base):
     __tablename__ = "raw_events"
     
-    id = Column(String, primary_key=True)
+    id = Column(String, primary_key=True, default=lambda: f"raw_{uuid.uuid4().hex[:8]}")
     event_id = Column(String, nullable=False, index=True)
     raw_data = Column(Text, nullable=False)
     storage_path = Column(String(500), nullable=True)

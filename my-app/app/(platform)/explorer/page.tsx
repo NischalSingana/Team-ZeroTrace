@@ -10,7 +10,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BackendErrorState } from "@/components/ui/error-fallback";
 import { Tooltip, MetricLabel } from "@/components/ui/tooltip";
-import { SkeletonBlock, Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { searchEvents } from "@/lib/services/events";
 import { fetchSources } from "@/lib/services/sources";
 import { isOfflineError } from "@/lib/services/api";
@@ -21,8 +21,11 @@ import type {
   NormalizedEvent,
   Severity,
   EventCategory,
+  EventOutcome,
+  LogFormat,
   LogSource,
   SearchQuery,
+  SearchFilter,
 } from "@/lib/types";
 import {
   Search,
@@ -34,16 +37,14 @@ import {
   ChevronRight,
   Download,
   X,
-  Terminal,
-  ArrowRight,
   FileSearch,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { EventInspectorPane } from "./inspector";
 
 const SEVERITIES: Severity[] = ["critical", "high", "medium", "low", "info", "unknown"];
-const OUTCOMES = ["success", "failure", "blocked"];
-const FORMATS = ["json_lines", "syslog_rfc3164", "syslog_rfc5424", "cef", "leef", "combined", "windows_evtx", "w3c_extended"];
+const OUTCOMES: EventOutcome[] = ["success", "failure", "partial", "unknown"];
+const FORMATS: LogFormat[] = ["json_lines", "syslog_rfc3164", "syslog_rfc5424", "cef", "leef", "combined", "windows_evtx", "w3c"];
 
 // ── Sort header ──────────────────────────────────────────────────
 function SortHeader({
@@ -200,8 +201,8 @@ function ExplorerInner() {
   const [searchText, setSearchText] = useState(searchParams.get("q") ?? "");
   const [selectedSeverities, setSelectedSeverities] = useState<Severity[]>([]);
   const [selectedCategories, setSelectedCategories] = useState<EventCategory[]>([]);
-  const [selectedFormats, setSelectedFormats] = useState<string[]>([]);
-  const [selectedOutcomes, setSelectedOutcomes] = useState<string[]>([]);
+  const [selectedFormats, setSelectedFormats] = useState<LogFormat[]>([]);
+  const [selectedOutcomes, setSelectedOutcomes] = useState<EventOutcome[]>([]);
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   
   const [sortBy, setSortBy] = useState("timestamp");
@@ -224,9 +225,17 @@ function ExplorerInner() {
     setLoading(true);
     setError(null);
     try {
+      const filters: SearchFilter[] = [
+        ...(selectedFormats.length > 0
+          ? [{ field: "raw_format", operator: "in", value: selectedFormats } as SearchFilter]
+          : []),
+        ...(selectedOutcomes.length > 0
+          ? [{ field: "outcome", operator: "in", value: selectedOutcomes } as SearchFilter]
+          : []),
+      ];
       const query: SearchQuery = {
         text: searchText || undefined,
-        filters: [],
+        filters,
         time_range: "24h",
         severity: selectedSeverities.length > 0 ? selectedSeverities : undefined,
         source_ids: selectedSourceIds.length > 0 ? selectedSourceIds : undefined,
@@ -240,12 +249,13 @@ function ExplorerInner() {
       setResults(res.events);
       setTotal(res.total);
       setQueryMs(res.query_ms);
+      setSelectedEventId(null);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
     } finally {
       setLoading(false);
     }
-  }, [searchText, selectedSeverities, selectedCategories, selectedSourceIds, page, sortBy, sortDir]);
+  }, [searchText, selectedSeverities, selectedCategories, selectedFormats, selectedOutcomes, selectedSourceIds, page, sortBy, sortDir]);
 
   const loadSources = useCallback(async () => {
     setSourcesLoading(true);
@@ -258,7 +268,6 @@ function ExplorerInner() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- async search; state updates happen after await
     void doSearch();
   }, [doSearch]);
   useEffect(() => { void loadSources(); }, [loadSources]);
@@ -337,7 +346,11 @@ function ExplorerInner() {
       {/* ── Search Bar ──────────────────────────────────────────── */}
       <div className="px-6 py-4 border-b border-[#1e2d3d] bg-[#050709] flex-shrink-0">
         <form
-          onSubmit={(e) => { e.preventDefault(); setPage(0); doSearch(); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (page !== 0) setPage(0);
+            else void doSearch();
+          }}
           className="flex flex-col gap-2"
         >
           <div className="flex items-center gap-3">

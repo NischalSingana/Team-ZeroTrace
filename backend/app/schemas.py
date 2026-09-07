@@ -1,7 +1,7 @@
 """ULPF Pydantic Schemas"""
 from datetime import datetime, timezone
 from typing import Optional, Literal, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 # ── Base Response ──────────────────────────────────────────────
@@ -304,6 +304,12 @@ class AnomalyAlertOut(BaseModel):
     event_count: int
     sample_event_id: Optional[str] = None
 
+    @computed_field
+    @property
+    def type(self) -> str:
+        """Mirror of alert_type for frontend compatibility."""
+        return self.alert_type
+
     class Config:
         from_attributes = True
 
@@ -407,7 +413,7 @@ class RawEventOut(BaseModel):
     event_id: str
     raw_data: str
     storage_path: Optional[str] = None
-    created_at: str
+    created_at: datetime
 
     class Config:
         from_attributes = True

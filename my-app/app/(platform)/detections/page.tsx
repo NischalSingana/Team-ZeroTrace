@@ -14,34 +14,21 @@ import {
 } from "lucide-react";
 import { fetchJson } from "@/lib/services/api";
 import { useRouter } from "next/navigation";
-
-type DetectionItem = {
-  id: string;
-  alert_type: string;
-  severity: string;
-  source_id: string | null;
-  source_name: string | null;
-  title: string;
-  description: string | null;
-  score: number;
-  detected_at: string;
-  status: string;
-  event_count: number;
-};
+import type { AnomalyAlert, AnomalyType } from "@/lib/types";
 
 export default function DetectionsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [detections, setDetections] = useState<DetectionItem[]>([]);
+  const [detections, setDetections] = useState<AnomalyAlert[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchJson<DetectionItem[]>("/api/detections/queue");
-      setDetections(data);
+      const data = await fetchJson<AnomalyAlert[]>("/api/detections/queue");
+      setDetections(data ?? []);
     } catch (err) {
       setError(err instanceof Error ? err : new Error("Failed to load detections"));
     } finally {
@@ -53,12 +40,15 @@ export default function DetectionsPage() {
     load();
   }, [load]);
 
-  const getSignalIcon = (type: string) => {
+  const getSignalIcon = (type: AnomalyType) => {
     switch (type) {
-      case 'auth_fail': return <AlertTriangle className="w-4 h-4 text-[#ef4444]" />;
-      case 'ip_burst': return <Activity className="w-4 h-4 text-[#f97316]" />;
-      case 'ml_outlier': return <BrainCircuit className="w-4 h-4 text-[#a855f7]" />;
-      case 'rule_trigger': return <ShieldAlert className="w-4 h-4 text-[#ef4444]" />;
+      case 'brute_force': return <AlertTriangle className="w-4 h-4 text-[#ef4444]" />;
+      case 'privilege_escalation': return <ShieldAlert className="w-4 h-4 text-[#ef4444]" />;
+      case 'spike': return <Activity className="w-4 h-4 text-[#f97316]" />;
+      case 'drop': return <Activity className="w-4 h-4 text-[#64748b]" />;
+      case 'format_drift': return <BrainCircuit className="w-4 h-4 text-[#a855f7]" />;
+      case 'exfiltration': return <Globe className="w-4 h-4 text-[#f97316]" />;
+      case 'lateral_movement': return <Network className="w-4 h-4 text-[#eab308]" />;
       default: return <Activity className="w-4 h-4 text-[#64748b]" />;
     }
   };
@@ -202,7 +192,7 @@ export default function DetectionsPage() {
                           tooltip="Model confidence that the observed signals represent a true attack."
                           className="text-[10px] text-[#64748b] uppercase tracking-widest font-bold mb-1 font-mono"
                         />
-                        <div className="text-4xl font-light text-[#ef4444] font-mono">{selectedDetection.score}%</div>
+                        <div className="text-4xl font-light text-[#ef4444] font-mono">{Math.round(selectedDetection.score * 100)}%</div>
                       </div>
                     </div>
 
@@ -244,7 +234,7 @@ export default function DetectionsPage() {
                     <div className="bg-[#0a0d12] border border-[#1e2d3d] rounded p-4 flex items-center gap-4">
                       <div className="p-2 bg-[#8b5cf6]/10 rounded border border-[#8b5cf6]/20"><Clock className="w-5 h-5 text-[#8b5cf6]" /></div>
                       <div>
-                        <div className="text-xl font-bold text-[#e2e8f0]">Active</div>
+                        <div className="text-xl font-bold text-[#e2e8f0] capitalize">{selectedDetection.status.replace(/_/g, " ")}</div>
                         <MetricLabel
                           label="Status"
                           tooltip="Current status of the anomaly."

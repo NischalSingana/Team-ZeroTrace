@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
-import { Tooltip, MetricLabel } from "@/components/ui/tooltip";
+import { Tooltip } from "@/components/ui/tooltip";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ArrowLeft, Play, LayoutTemplate, Bug, FileSearch } from "lucide-react";
 import { ConfigPane, MappingPane, Rule, Mapping } from "./components";

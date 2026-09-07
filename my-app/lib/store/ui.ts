@@ -6,6 +6,7 @@ interface UIState {
   liveFeedActive: boolean;
   selectedSourceId: string | null;
   searchQuery: string;
+  _hasHydrated: boolean;
   // Actions
   toggleSidebar: () => void;
   setSidebarCollapsed: (v: boolean) => void;
@@ -13,6 +14,7 @@ interface UIState {
   setLiveFeedActive: (v: boolean) => void;
   setSelectedSourceId: (id: string | null) => void;
   setSearchQuery: (q: string) => void;
+  setHasHydrated: (state: boolean) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -22,6 +24,7 @@ export const useUIStore = create<UIState>()(
       liveFeedActive: false,
       selectedSourceId: null,
       searchQuery: "",
+      _hasHydrated: false,
       toggleSidebar: () =>
         set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebarCollapsed: (v) => set({ sidebarCollapsed: v }),
@@ -29,6 +32,7 @@ export const useUIStore = create<UIState>()(
       setLiveFeedActive: (v) => set({ liveFeedActive: v }),
       setSelectedSourceId: (id) => set({ selectedSourceId: id }),
       setSearchQuery: (q) => set({ searchQuery: q }),
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
     }),
     {
       name: "ulpf-ui-state",
@@ -36,6 +40,10 @@ export const useUIStore = create<UIState>()(
         sidebarCollapsed: s.sidebarCollapsed,
         liveFeedActive: s.liveFeedActive,
       }),
+      skipHydration: true,
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

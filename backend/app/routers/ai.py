@@ -1,5 +1,6 @@
 """AI Mapping Router"""
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.exc import IntegrityError
 
 from app.schemas import (
     AIAnalyzeRequest, AIAnalyzeResponse,
@@ -37,7 +38,14 @@ async def generate_parser(req: AIGenerateParserRequest, db=Depends(get_db)):
         **parser_config
     )
     db.add(db_parser)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail=f"A parser named '{parser_config['name']}' already exists",
+        )
     await db.refresh(db_parser)
     
     return ApiResponse(data={

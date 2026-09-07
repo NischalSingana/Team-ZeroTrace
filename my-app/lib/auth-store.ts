@@ -30,6 +30,7 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'ulpf-auth',
       storage: createJSONStorage(() => localStorage),
+      partialize: (s) => ({ token: s.token, user: s.user }),
       skipHydration: true,
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

@@ -54,7 +54,10 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
         false
       );
     }
-    const json = await res.json();
+    // 204 No Content / empty body: nothing to parse
+    const text = await res.text();
+    if (!text.trim()) return undefined as T;
+    const json = JSON.parse(text);
     return json.data ?? json;
   } catch (err) {
     if (err instanceof BackendError) throw err;

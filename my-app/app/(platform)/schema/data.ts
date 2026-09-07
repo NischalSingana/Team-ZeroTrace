@@ -17,22 +17,6 @@ export interface SchemaField {
   usageFrequency: number; // percentage 0-100
 }
 
-export const CATEGORIES: { name: SchemaCategory; count: number }[] = [
-  { name: "Event", count: 12 },
-  { name: "Timestamp", count: 4 },
-  { name: "Source", count: 15 },
-  { name: "Destination", count: 15 },
-  { name: "User", count: 8 },
-  { name: "Network", count: 10 },
-  { name: "Device", count: 6 },
-  { name: "Application", count: 5 },
-  { name: "Cloud", count: 9 },
-  { name: "Threat", count: 7 },
-  { name: "Processing", count: 3 },
-  { name: "Lineage", count: 2 },
-  { name: "Raw", count: 1 },
-];
-
 export const MOCK_SCHEMA: SchemaField[] = [
   // Event
   {
@@ -189,3 +173,25 @@ export const MOCK_SCHEMA: SchemaField[] = [
     usageFrequency: 80
   }
 ];
+
+const CATEGORY_ORDER: SchemaCategory[] = [
+  "Event",
+  "Timestamp",
+  "Source",
+  "Destination",
+  "User",
+  "Network",
+  "Device",
+  "Application",
+  "Cloud",
+  "Threat",
+  "Processing",
+  "Lineage",
+  "Raw",
+];
+
+export const CATEGORIES: { name: SchemaCategory; count: number }[] =
+  CATEGORY_ORDER.map((name) => ({
+    name,
+    count: MOCK_SCHEMA.filter((f) => f.category === name).length,
+  }));

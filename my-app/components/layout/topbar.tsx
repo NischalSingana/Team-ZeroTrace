@@ -9,7 +9,9 @@ import { StatusDot } from "@/components/ui/status-dot";
 import { cn } from "@/lib/utils/cn";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useAuthStore } from "@/lib/auth-store";
+import { getApiErrorMessage } from "@/lib/services/api";
 
 interface TopbarProps {
   alertCount?: number;
@@ -37,6 +39,7 @@ export function Topbar({ alertCount = 5 }: TopbarProps) {
 
   const handleLogout = () => {
     logout();
+    document.cookie = "ulpf-auth-token=; path=/; max-age=0; samesite=strict";
     router.replace("/login");
   };
 
@@ -54,10 +57,13 @@ export function Topbar({ alertCount = 5 }: TopbarProps) {
       } else {
         await resumeStream();
       }
+      toggleLiveFeed();
     } catch (err) {
       console.error("Failed to toggle stream:", err);
+      toast.error("Failed to update stream state", {
+        description: getApiErrorMessage(err),
+      });
     }
-    toggleLiveFeed();
   };
 
   return (

@@ -86,7 +86,7 @@ export const MOCK_SYSTEM_HEALTH: SystemHealth = {
 export const MOCK_ANOMALY_ALERTS: AnomalyAlert[] = [
   {
     id: "ano_001",
-    type: "brute_force",
+    alert_type: "brute_force",
     severity: "critical",
     source_id: "src_009",
     source_name: "Snort IDS — PERIMETER",
@@ -100,7 +100,7 @@ export const MOCK_ANOMALY_ALERTS: AnomalyAlert[] = [
   },
   {
     id: "ano_002",
-    type: "privilege_escalation",
+    alert_type: "privilege_escalation",
     severity: "high",
     source_id: "src_005",
     source_name: "AWS CloudTrail — Production Account",
@@ -114,7 +114,7 @@ export const MOCK_ANOMALY_ALERTS: AnomalyAlert[] = [
   },
   {
     id: "ano_003",
-    type: "spike",
+    alert_type: "spike",
     severity: "medium",
     source_id: "src_001",
     source_name: "Cisco ASA — DC-EDGE-01",
@@ -128,7 +128,7 @@ export const MOCK_ANOMALY_ALERTS: AnomalyAlert[] = [
   },
   {
     id: "ano_004",
-    type: "format_drift",
+    alert_type: "format_drift",
     severity: "medium",
     source_id: "src_006",
     source_name: "Apache HTTP Server — LEGACY-APP",
@@ -142,7 +142,7 @@ export const MOCK_ANOMALY_ALERTS: AnomalyAlert[] = [
   },
   {
     id: "ano_005",
-    type: "drop",
+    alert_type: "drop",
     severity: "high",
     source_id: "src_011",
     source_name: "Fortinet FortiGate — BRANCH-03",

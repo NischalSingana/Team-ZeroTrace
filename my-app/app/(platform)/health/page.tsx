@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, type ReactNode } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import {
   HardDrive, AlertCircle, Activity,
@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
 import { SkeletonBlock } from "@/components/ui/skeleton";
-import { BackendErrorState } from "@/components/ui/error-fallback";
+import { Timestamp } from "@/components/ui/timestamp";
 import { getSystemHealth } from "@/lib/services/health";
 import type { SystemHealth } from "@/lib/types";
 
@@ -54,6 +54,55 @@ const FlowNode = ({ title, status, metric, subMetric }: { title: string; status:
   );
 };
 
+const SERVICE_STATUS_MAP: Record<SystemHealth["services"][number]["status"], ServiceStatus> = {
+  up: "Healthy",
+  degraded: "Degraded",
+  down: "Offline",
+};
+
+interface HealthRow {
+  key: string;
+  name: string;
+  category?: string;
+  status: ServiceStatus;
+  cpu?: number;
+  memory?: string;
+  throughput?: string;
+  latency?: string;
+  errors?: number;
+  heartbeat: ReactNode;
+}
+
+function buildRows(health: SystemHealth | null): HealthRow[] {
+  if (health) {
+    return health.services.map((s) => ({
+      key: s.name,
+      name: s.name,
+      status: SERVICE_STATUS_MAP[s.status] ?? "Healthy",
+      latency: `${s.latency_ms}ms`,
+      heartbeat: <Timestamp iso={s.last_checked} className="text-[10px]" />,
+    }));
+  }
+  return COMPONENTS.map((c) => ({
+    key: c.id,
+    name: c.name,
+    category: c.category,
+    status: c.status,
+    cpu: c.cpu,
+    memory: c.memory,
+    throughput: c.throughput,
+    latency: c.latency,
+    errors: c.errors,
+    heartbeat: <span className="text-[#64748b] text-[10px] font-mono">{c.lastHeartbeat}</span>,
+  }));
+}
+
+const METRIC_STATUS_COLORS: Record<SystemHealth["metrics"][number]["status"], string> = {
+  healthy: "#4ade80",
+  warning: "#eab308",
+  critical: "#ef4444",
+};
+
 export default function HealthPage() {
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,6 +125,8 @@ export default function HealthPage() {
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
+  const rows = buildRows(health);
+
   return (
     <div className="flex flex-col h-full bg-[#050709] overflow-y-auto overflow-x-hidden">
       
@@ -94,15 +145,72 @@ export default function HealthPage() {
         }
       />
 
-      {error ? (
+      {health && (
+        <div className="px-6 py-2 border-b border-[#1e2d3d] bg-[#050709] flex items-center gap-4 flex-shrink-0">
+          <span className={cn(
+            "text-[10px] font-mono font-bold uppercase tracking-widest",
+            health.overall_status === "healthy" ? "text-[#4ade80]" :
+            health.overall_status === "degraded" ? "text-[#eab308]" : "text-[#ef4444]"
+          )}>
+            Overall: {health.overall_status}
+          </span>
+          <span className="text-[#64748b] text-[10px] font-mono">
+            Backend reporting · <Timestamp iso={health.last_updated} className="text-[10px]" />
+          </span>
+        </div>
+      )}
+
+      {error && !health && (
+        <div className="px-6 py-2 border-b border-[#ef4444]/20 bg-[#450a0a]/20 text-[#fca5a5] text-[10px] font-mono flex-shrink-0">
+          Backend unreachable ({error.message}) — showing cached reference data.
+        </div>
+      )}
+
+      {loading && !health ? (
         <div className="flex-1 p-6">
-          <BackendErrorState error={error} onRetry={fetchData} />
+          <SkeletonBlock rows={14} />
         </div>
       ) : (
 
 
       <div className="p-6 space-y-6 max-w-[1600px] mx-auto w-full">
-        
+
+        {/* Live System Metrics */}
+        {health && health.metrics.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+            {health.metrics.map((m) => {
+              const color = METRIC_STATUS_COLORS[m.status] ?? "#64748b";
+              const max = Math.max(...m.history, m.value, 1);
+              return (
+                <div key={m.name} className="bg-[#0a0d12] border border-[#1e2d3d] rounded-lg p-5">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[#64748b] text-[10px] uppercase tracking-widest font-mono">{m.label}</span>
+                    <span
+                      className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border"
+                      style={{ color, backgroundColor: `${color}15`, borderColor: `${color}33` }}
+                    >
+                      {m.status}
+                    </span>
+                  </div>
+                  <div className="text-2xl font-mono font-bold text-[#e2e8f0] mb-3">
+                    {m.value}
+                    <span className="text-sm text-[#64748b] font-normal ml-1">{m.unit}</span>
+                  </div>
+                  <div className="flex items-end gap-0.5 h-8">
+                    {m.history.map((h, i) => (
+                      <div
+                        key={i}
+                        className="flex-1 rounded-sm"
+                        style={{ height: `${Math.max((h / max) * 100, 4)}%`, backgroundColor: `${color}55` }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Visual Dependency Flow */}
         <div className="bg-[#0a0d12] border border-[#1e2d3d] rounded-lg p-6 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#3b82f6] via-[#f97316] to-[#4ade80]" />
@@ -209,15 +317,18 @@ export default function HealthPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1e2d3d]/50">
-                {COMPONENTS.map((comp) => {
+                {rows.map((comp) => {
                   const config = getStatusConfig(comp.status);
-                  
+                  const latencyMs = comp.latency && comp.latency.includes("ms") ? parseInt(comp.latency) : 0;
+
                   return (
-                    <tr key={comp.id} className="hover:bg-[#0d1117] transition-colors">
+                    <tr key={comp.key} className="hover:bg-[#0d1117] transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex flex-col">
                           <span className="text-[#e2e8f0] text-xs font-semibold">{comp.name}</span>
-                          <span className="text-[#64748b] text-[10px] font-mono mt-0.5">{comp.category}</span>
+                          {comp.category && (
+                            <span className="text-[#64748b] text-[10px] font-mono mt-0.5">{comp.category}</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
@@ -226,31 +337,35 @@ export default function HealthPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2 justify-center">
-                          <div className="w-12 h-1.5 bg-[#1c2433] rounded-full overflow-hidden">
-                            <div className={cn("h-full", comp.cpu > 85 ? "bg-[#ef4444]" : comp.cpu > 70 ? "bg-[#eab308]" : "bg-[#3b82f6]")} style={{ width: `${comp.cpu}%` }} />
+                        {typeof comp.cpu === "number" ? (
+                          <div className="flex items-center gap-2 justify-center">
+                            <div className="w-12 h-1.5 bg-[#1c2433] rounded-full overflow-hidden">
+                              <div className={cn("h-full", comp.cpu > 85 ? "bg-[#ef4444]" : comp.cpu > 70 ? "bg-[#eab308]" : "bg-[#3b82f6]")} style={{ width: `${comp.cpu}%` }} />
+                            </div>
+                            <span className="text-[#94a3b8] text-xs font-mono w-8">{comp.cpu}%</span>
                           </div>
-                          <span className="text-[#94a3b8] text-xs font-mono w-8">{comp.cpu}%</span>
-                        </div>
+                        ) : (
+                          <span className="block text-center text-[#64748b] text-xs font-mono">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="text-[#94a3b8] text-xs font-mono">{comp.memory}</span>
+                        <span className="text-[#94a3b8] text-xs font-mono">{comp.memory ?? "—"}</span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="text-[#e2e8f0] text-xs font-mono">{comp.throughput}</span>
+                        <span className="text-[#e2e8f0] text-xs font-mono">{comp.throughput ?? "—"}</span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className={cn("text-xs font-mono font-bold", comp.latency.includes("ms") && parseInt(comp.latency) > 100 ? "text-[#f97316]" : "text-[#4ade80]")}>
-                          {comp.latency}
+                        <span className={cn("text-xs font-mono font-bold", latencyMs > 100 ? "text-[#f97316]" : "text-[#4ade80]")}>
+                          {comp.latency ?? "—"}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className={cn("text-xs font-mono font-bold", comp.errors > 0 ? "text-[#ef4444]" : "text-[#64748b]")}>
-                          {comp.errors}
+                        <span className={cn("text-xs font-mono font-bold", (comp.errors ?? 0) > 0 ? "text-[#ef4444]" : "text-[#64748b]")}>
+                          {comp.errors ?? "—"}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <span className="text-[#64748b] text-[10px] font-mono">{comp.lastHeartbeat}</span>
+                        {comp.heartbeat}
                       </td>
                     </tr>
                   );

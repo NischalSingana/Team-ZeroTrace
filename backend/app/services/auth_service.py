@@ -13,7 +13,7 @@ from app.models import User
 from app.schemas import TokenData
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
 
 # Secret key for JWT (should be in env, using settings.SECRET_KEY)
 ALGORITHM = "HS256"
