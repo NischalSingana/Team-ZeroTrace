@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 interface StatusBlockProps {
   label: string;
   value: string;
-  icon: React.ElementType;
+  icon: React.ElementType<{ className?: string }>;
   intent?: "neutral" | "secure" | "warning";
 }
 
