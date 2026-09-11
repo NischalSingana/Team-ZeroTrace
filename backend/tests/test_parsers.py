@@ -43,7 +43,8 @@ class TestParserEngine:
 
 class TestAIService:
     @pytest.mark.asyncio
-    async def test_fallback_analysis(self):
+    async def test_fallback_analysis(self, monkeypatch):
+        monkeypatch.setattr("app.services.ai_service.settings.AI_ENABLED", False)
         ai = AIService()
         result = await ai.analyze_log('{"src": "10.0.0.1", "dst": "10.0.0.2", "user": "admin"}')
         assert "suggestions" in result

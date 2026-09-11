@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { motion } from "framer-motion";
 import { PageHeader } from "@/components/layout/page-header";
 import { MetricCard } from "@/components/ui/metric-card";
 import { SeverityBadge } from "@/components/ui/badge";
@@ -468,7 +469,18 @@ export default function OverviewPage() {
           )}
 
           {/* ── System Metric Strip ──────────────────────────────────── */}
-          <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-px bg-[#1e2d3d] border-b border-[#1e2d3d]">
+          <motion.div 
+            initial="hidden"
+            animate="visible"
+            variants={{
+              hidden: { opacity: 0 },
+              visible: {
+                opacity: 1,
+                transition: { staggerChildren: 0.1 }
+              }
+            }}
+            className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-px bg-[#1e2d3d] border-b border-[#1e2d3d]"
+          >
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="bg-[#080b0f]">
@@ -537,7 +549,7 @@ export default function OverviewPage() {
                 </Tooltip>
               </>
             )}
-          </div>
+          </motion.div>
 
           {/* ── Main Dashboard Layout ────────────────────────────────────────────── */}
           <div className="flex-1 overflow-y-auto flex flex-col">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUIStore } from "@/lib/store/ui";
+import { motion } from "framer-motion";
 import { StatusDot } from "@/components/ui/status-dot";
 import { cn } from "@/lib/utils/cn";
 import {
@@ -155,24 +156,32 @@ export function Sidebar() {
                   href={item.href}
                   title={sidebarCollapsed ? item.label : undefined}
                   className={cn(
-                    "sidebar-item",
-                    active && "active",
+                    "relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors group z-10",
+                    active ? "text-[#e2e8f0]" : "text-[#94a3b8] hover:text-[#e2e8f0]",
                     sidebarCollapsed && "justify-center px-0 w-10 mx-auto"
                   )}
                   aria-current={active ? "page" : undefined}
                 >
+                  {active && (
+                    <motion.div
+                      layoutId="active-nav-item"
+                      className="absolute inset-0 bg-[#1e2d3d]/50 rounded-lg -z-10 border border-[#3b82f6]/20 shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+                      initial={false}
+                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    />
+                  )}
                   <Icon
                     className={cn(
-                      "sidebar-icon w-4 h-4 flex-shrink-0 transition-colors",
-                      active ? "text-[#3b82f6]" : "text-[#374151]"
+                      "w-4 h-4 flex-shrink-0 transition-colors z-10",
+                      active ? "text-[#3b82f6]" : "text-[#64748b] group-hover:text-[#94a3b8]"
                     )}
                   />
                   {!sidebarCollapsed && (
                     <>
-                      <span className="flex-1 truncate">{item.label}</span>
+                      <span className="flex-1 truncate z-10">{item.label}</span>
                       {item.badge && (
                         <span
-                          className="flex-shrink-0 text-[9px] font-bold font-mono px-1 py-0.5 rounded"
+                          className="flex-shrink-0 text-[9px] font-bold font-mono px-1 py-0.5 rounded z-10"
                           style={{
                             backgroundColor: `${item.badgeColor}22`,
                             color: item.badgeColor,

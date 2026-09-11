@@ -16,6 +16,13 @@ interface MetricCardProps {
   valueColor?: string;
 }
 
+import { motion } from "framer-motion";
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { opacity: 1, y: 0 }
+};
+
 export function MetricCard({
   label,
   value,
@@ -31,9 +38,10 @@ export function MetricCard({
   const dir = delta !== undefined ? deltaDirection(delta) : "flat";
 
   return (
-    <div
+    <motion.div
+      variants={itemVariants}
       className={cn(
-        "flex flex-col gap-1 border border-[#1e2d3d] bg-[#0d1117] rounded p-3 min-w-0",
+        "flex flex-col gap-1 border border-[#1e2d3d] bg-[#0d1117] rounded p-3 min-w-0 transition-colors hover:bg-[#151b23] hover:border-[#3b82f6]/30",
         emphasis && "border-[#243044]",
         className
       )}
@@ -86,6 +94,6 @@ export function MetricCard({
           )}
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

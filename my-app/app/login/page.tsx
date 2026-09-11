@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../lib/auth-store';
+import { motion } from 'framer-motion';
+import { ThreeBackground } from './ThreeBackground';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -47,22 +49,15 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex h-screen w-full items-center justify-center overflow-hidden bg-[#050709]">
-      {/* Animated background grid */}
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.03]"
-        style={{
-          backgroundImage: `linear-gradient(#3b82f6 1px, transparent 1px), linear-gradient(90deg, #3b82f6 1px, transparent 1px)`,
-          backgroundSize: '60px 60px',
-        }}
-      />
-
-      {/* Ambient glow orbs */}
-      <div className="pointer-events-none absolute -top-40 -left-40 h-96 w-96 rounded-full bg-[#3b82f6] opacity-[0.06] blur-[100px]" />
-      <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-[#8b5cf6] opacity-[0.06] blur-[100px]" />
-      <div className="pointer-events-none absolute top-1/2 left-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#06b6d4] opacity-[0.04] blur-[80px]" />
+      <ThreeBackground />
 
       {/* Card */}
-      <div className="relative z-10 w-full max-w-sm mx-4">
+      <motion.div 
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="relative z-10 w-full max-w-sm mx-4"
+      >
         {/* Glassmorphism card */}
         <div
           className="rounded-2xl border border-[#1e2d3d] bg-[#0d1117]/80 p-8 shadow-2xl"
@@ -174,7 +169,7 @@ export default function LoginPage() {
         <p className="mt-4 text-center text-[10px] font-mono text-[#334155]">
           ZeroTrace ULPF · SIH26156 · Team ZeroTrace
         </p>
-      </div>
+      </motion.div>
     </div>
   );
 }

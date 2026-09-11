@@ -30,8 +30,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${inter.variable} ${geistMono.variable} dark h-full`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-[#080b0f] text-[#e2e8f0] antialiased">
+      <body className="min-h-full flex flex-col bg-[#080b0f] text-[#e2e8f0] antialiased" suppressHydrationWarning>
         {children}
         <Toaster />
       </body>
