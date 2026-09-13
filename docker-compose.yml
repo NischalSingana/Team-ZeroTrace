@@ -213,8 +213,6 @@ services:
       - backend
     ports:
       - "8080:80"  # Exposes Nginx so Coolify can route your domain here
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     deploy:
       resources:
         limits:
