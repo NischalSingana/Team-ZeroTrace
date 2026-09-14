@@ -65,6 +65,7 @@ services:
       - bootstrap.memory_lock=true
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
       - DISABLE_SECURITY_PLUGIN=true
+      - node.store.allow_mmap=false
     ulimits:
       memlock:
         soft: -1
