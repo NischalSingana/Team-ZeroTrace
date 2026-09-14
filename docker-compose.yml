@@ -62,7 +62,7 @@ services:
     image: opensearchproject/opensearch:2.15.0
     environment:
       - discovery.type=single-node
-      - bootstrap.memory_lock=true
+      - bootstrap.memory_lock=false
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
       - DISABLE_SECURITY_PLUGIN=true
       - node.store.allow_mmap=false
