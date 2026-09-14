@@ -160,7 +160,7 @@ export default function LoginPage() {
               Demo credentials:{' '}
               <span className="text-[#60a5fa]">admin</span>
               {' / '}
-              <span className="text-[#60a5fa]">admin</span>
+              <span className="text-[#60a5fa]">admin@123</span>
             </p>
           </div>
         </div>
