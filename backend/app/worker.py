@@ -34,7 +34,7 @@ async def process_message(msg_value: dict, db: AsyncSession):
         return
         
     # Parse log
-    parsed = parse_log(raw_log, source.format)
+    parsed = parse_log(raw_log, str(source.format))
     
     # Simple mapping (in reality, would use Parser's field_mappings)
     event_id = f"evt_{uuid.uuid4().hex[:8]}"
