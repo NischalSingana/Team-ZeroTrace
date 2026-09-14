@@ -1,8 +1,9 @@
 'use client';
 
-import { useRef, useMemo } from 'react';
+import { useRef, useMemo, type ComponentProps } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Points, PointMaterial } from '@react-three/drei';
+import * as THREE from 'three';
 
 // A simple deterministic random generator for the sphere
 function inSphere(buffer: Float32Array, radius: number) {
@@ -20,8 +21,8 @@ function inSphere(buffer: Float32Array, radius: number) {
   return buffer;
 }
 
-function ParticleSwarm(props: any) {
-  const ref = useRef<any>(null);
+function ParticleSwarm(props: Omit<ComponentProps<typeof Points>, 'ref'>) {
+  const ref = useRef<THREE.Points>(null);
   
   const sphere = useMemo(() => {
     const data = new Float32Array(5000 * 3);
