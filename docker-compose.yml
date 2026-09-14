@@ -50,11 +50,6 @@ services:
       resources:
         limits:
           memory: 256M
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 15
     restart: unless-stopped
 
   # ── OpenSearch ─────────────────────────────────────────────────
