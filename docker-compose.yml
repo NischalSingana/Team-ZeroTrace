@@ -147,7 +147,6 @@ services:
       OPENSEARCH_URL: http://opensearch:9200
       MINIO_ENDPOINT: minio:9000
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPEN_KEY_1: ${OPEN_KEY_1:-}
       OPEN_KEY_2: ${OPEN_KEY_2:-}
       OPEN_KEY_3: ${OPEN_KEY_3:-}
@@ -183,7 +182,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://ulpf:ulpf@postgres:5432/ulpf}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPEN_KEY_1: ${OPEN_KEY_1:-}
     deploy:
       resources:
         limits:
