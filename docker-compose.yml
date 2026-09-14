@@ -1,7 +1,5 @@
-version: "3.8"
-
+version: '3.8'
 services:
-  # ── PostgreSQL ─────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     environment:
@@ -9,35 +7,28 @@ services:
       POSTGRES_PASSWORD: ulpf
       POSTGRES_DB: ulpf
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    deploy:
-      resources:
-        limits:
-          memory: 256M
+    - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ulpf -d ulpf"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U ulpf -d ulpf
       interval: 5s
       timeout: 5s
       retries: 15
     restart: unless-stopped
-
-  # ── Redis ──────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     volumes:
-      - redis_data:/data
-    deploy:
-      resources:
-        limits:
-          memory: 128M
+    - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+      - CMD
+      - redis-cli
+      - ping
       interval: 5s
       timeout: 3s
       retries: 15
     restart: unless-stopped
-
-  # ── MinIO ──────────────────────────────────────────────────────
   minio:
     image: quay.io/minio/minio:latest
     command: server /data --console-address ":9001"
@@ -45,63 +36,41 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     volumes:
-      - minio_data:/data
-    deploy:
-      resources:
-        limits:
-          memory: 256M
+    - minio_data:/data
     restart: unless-stopped
-
-  # ── OpenSearch ─────────────────────────────────────────────────
   opensearch:
     image: opensearchproject/opensearch:2.15.0
     environment:
-      - discovery.type=single-node
-      - bootstrap.memory_lock=false
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
-      - DISABLE_SECURITY_PLUGIN=true
-      - node.store.allow_mmap=false
+    - discovery.type=single-node
+    - bootstrap.memory_lock=false
+    - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    - DISABLE_SECURITY_PLUGIN=true
+    - node.store.allow_mmap=false
     ulimits:
       memlock:
         soft: -1
         hard: -1
     volumes:
-      - opensearch_data:/usr/share/opensearch/data
-    deploy:
-      resources:
-        limits:
-          memory: 1.2G
+    - opensearch_data:/usr/share/opensearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:9200/_cluster/health || exit 1"]
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:9200/_cluster/health || exit 1
       interval: 10s
       timeout: 5s
       retries: 15
     restart: unless-stopped
-
-  # ── Kafka + Zookeeper ──────────────────────────────────────────
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-      KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-    healthcheck:
-      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      KAFKA_HEAP_OPTS: -Xmx256M -Xms256M
     restart: unless-stopped
-
   kafka:
     image: confluentinc/cp-kafka:7.6.0
     depends_on:
-      - zookeeper
-    # ports:
-    #   - "9092:9092"
+    - zookeeper
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -109,32 +78,19 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_HEAP_OPTS: "-Xmx400M -Xms400M"
-    deploy:
-      resources:
-        limits:
-          memory: 768M
-    healthcheck:
-      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      KAFKA_HEAP_OPTS: -Xmx400M -Xms400M
     restart: unless-stopped
-
   kafka-init:
     image: confluentinc/cp-kafka:7.6.0
     depends_on:
       kafka:
         condition: service_started
-    command: >
-      bash -c "
-      echo 'Waiting for Kafka to be ready...' &&
-      cub kafka-ready -b kafka:29092 1 20 &&
-      kafka-topics --create --if-not-exists --bootstrap-server kafka:29092 --partitions 1 --replication-factor 1 --topic ulpf_ingest &&
-      echo 'Topic ulpf_ingest created.'
-      "
+    command: 'bash -c " echo ''Waiting for Kafka to be ready...'' && cub kafka-ready
+      -b kafka:29092 1 20 && kafka-topics --create --if-not-exists --bootstrap-server
+      kafka:29092 --partitions 1 --replication-factor 1 --topic ulpf_ingest && echo
+      ''Topic ulpf_ingest created.'' "
 
-  # ── ULPF Backend ───────────────────────────────────────────────
+      '
   backend:
     build:
       context: ./backend
@@ -162,18 +118,14 @@ services:
       AI_ENABLED: ${AI_ENABLED:-true}
       DEMO_MODE: ${DEMO_MODE:-true}
       SECRET_KEY: ${SECRET_KEY:-ulpf-change-me-in-production}
-    deploy:
-      resources:
-        limits:
-          memory: 512M
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://127.0.0.1:8000/api/health || exit 1"]
+      test:
+      - CMD-SHELL
+      - curl -f http://127.0.0.1:8000/api/health || exit 1
       interval: 10s
       timeout: 5s
       retries: 15
-
-  # ── ULPF Kafka Worker ──────────────────────────────────────────
   worker:
     build:
       context: ./backend
@@ -188,61 +140,29 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://ulpf:ulpf@postgres:5432/ulpf}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       OPEN_KEY_1: ${OPEN_KEY_1:-}
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    healthcheck:
-      test: ["CMD-SHELL", "ps aux | grep [p]ython || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: unless-stopped
-
-  # ── ULPF Frontend ──────────────────────────────────────────────
   frontend:
     build:
       context: ./my-app
       dockerfile: Dockerfile
     depends_on:
-      - backend
+    - backend
     environment:
-      NEXT_PUBLIC_API_URL: ""
+      NEXT_PUBLIC_API_URL: ''
       BACKEND_URL: http://backend:8000
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: unless-stopped
-
-  # ── Nginx Reverse Proxy ────────────────────────────────────────
   nginx:
     build:
       context: ./nginx
       dockerfile: Dockerfile
     depends_on:
-      - frontend
-      - backend
+    - frontend
+    - backend
     ports:
-      - "80"  # Let Docker pick a random host port to avoid conflicts, Coolify will still route to 80
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-    healthcheck:
-      test: ["CMD-SHELL", "nginx -t || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    - '80'
     restart: unless-stopped
-
 volumes:
-  postgres_data:
-  redis_data:
-  minio_data:
-  opensearch_data:
+  postgres_data: null
+  redis_data: null
+  minio_data: null
+  opensearch_data: null
