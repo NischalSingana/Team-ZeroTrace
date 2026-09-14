@@ -81,8 +81,9 @@ async def consume():
             logger.error(f"Failed to connect to Kafka: {e}")
             await asyncio.sleep(5)
     else:
-        logger.error("Could not start Kafka consumer after retries")
-        return
+        logger.error("Could not start Kafka consumer after retries. Sleeping to prevent crash-loop.")
+        while True:
+            await asyncio.sleep(60)
 
     try:
         async for msg in consumer:
