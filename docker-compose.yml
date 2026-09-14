@@ -8,26 +8,11 @@ services:
       POSTGRES_DB: ulpf
     volumes:
     - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - pg_isready -U ulpf -d ulpf
-      interval: 5s
-      timeout: 5s
-      retries: 15
     restart: unless-stopped
   redis:
     image: redis:7-alpine
     volumes:
     - redis_data:/data
-    healthcheck:
-      test:
-      - CMD
-      - redis-cli
-      - ping
-      interval: 5s
-      timeout: 3s
-      retries: 15
     restart: unless-stopped
   minio:
     image: quay.io/minio/minio:latest
@@ -52,13 +37,6 @@ services:
         hard: -1
     volumes:
     - opensearch_data:/usr/share/opensearch/data
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - curl -f http://127.0.0.1:9200/_cluster/health || exit 1
-      interval: 10s
-      timeout: 5s
-      retries: 15
     restart: unless-stopped
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
@@ -97,11 +75,11 @@ services:
       dockerfile: Dockerfile
     depends_on:
       postgres:
-        condition: service_healthy
+        condition: service_started
       redis:
-        condition: service_healthy
+        condition: service_started
       opensearch:
-        condition: service_healthy
+        condition: service_started
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://ulpf:ulpf@postgres:5432/ulpf}
       REDIS_URL: redis://redis:6379/0
@@ -119,13 +97,6 @@ services:
       DEMO_MODE: ${DEMO_MODE:-true}
       SECRET_KEY: ${SECRET_KEY:-ulpf-change-me-in-production}
     restart: unless-stopped
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - curl -f http://127.0.0.1:8000/api/health || exit 1
-      interval: 10s
-      timeout: 5s
-      retries: 15
   worker:
     build:
       context: ./backend
@@ -133,7 +104,7 @@ services:
     command: python -m app.worker
     depends_on:
       postgres:
-        condition: service_healthy
+        condition: service_started
       kafka:
         condition: service_started
     environment:
